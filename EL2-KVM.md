@@ -201,10 +201,66 @@ moins une fois pour obtenir `Module.symvers`.
 
 **ADSP/CDSP ne démarrent pas** — `error -22 initializing firmware`. TrustZone refuse le
 service PAS dès que Linux possède EL2. Donc pas d'audio ni de décodage vidéo matériel.
-[qebspil](https://github.com/stephan-gh/qebspil) démarre les co-processeurs en EL1 avant
-`ExitBootServices` ; il reconnaît nos compatibles (`qcom,x1e80100-adsp-pas` et
-`-cdsp-pas`) sans modification, mais réclame des patchs noyau hors-arbre pour que Linux
-reprenne la main sur un DSP déjà démarré. Non résolu ici.
+
+### qebspil : la moitié amont fonctionne
+
+[qebspil](https://github.com/stephan-gh/qebspil) démarre les co-processeurs en EL1, juste
+avant `ExitBootServices`. **Il fonctionne sur x1p42100**, ce que sa liste de plateformes
+ne laissait pas espérer — elle ne mentionne que SC7180, SC8280XP et X1E. Aucune
+modification de code n'a été nécessaire : le X1P42100 réutilise les compatibles X1E
+(`qcom,x1e80100-adsp-pas` et `-cdsp-pas`), déjà présents dans sa table `pil-types.c`.
+
+Il faut le compiler avec `QEBSPIL_ALWAYS_START=1`, notre device tree ne portant pas la
+propriété `qcom,broken-reset` sur laquelle il se restreint par défaut. Les firmwares vont
+dans `/firmware/` à la racine de la même partition que le binaire, sous le chemin donné
+par `firmware-name` dans le DT.
+
+Vérifié en instrumentant qebspil pour qu'il écrive sur l'ESP (sa sortie console passe
+avant que GRUB ne dessine son menu, donc invisible en pratique) :
+
+```
+--- qebspil chargé ---
+scm_init: Success
+trouvé: qcom,x1e80100-adsp-pas
+trouvé: qcom,x1e80100-cdsp-pas
+dtb_enumerate_rprocs: Success
+démarrage: qcom,x1e80100-adsp-pas
+démarrage: qcom,x1e80100-cdsp-pas
+pil_finish_all: Success
+```
+
+### Ce qui manque encore : le côté noyau
+
+Les DSP tournent, mais Linux l'ignore et tente quand même le chargement PAS, qui échoue.
+`drivers/remoteproc/qcom_q6v5_pas.c` ne connaît qu'un seul scénario — charger le firmware
+lui-même. Il n'expose pas d'opération `.attach` et ne place jamais le rproc dans l'état
+`RPROC_DETACHED`, alors que le cœur de remoteproc sait le faire (`rproc_attach()`,
+`RPROC_DETACHED`, utilisés par les pilotes i.MX, STM32 et TI).
+
+Un `.attach` devrait reprendre `qcom_pas_start()` en sautant l'authentification PAS :
+
+```
+1. qcom_q6v5_prepare()          handshake / IRQ
+2. domaines de puissance proxy  } inoffensifs, votes comptés en référence,
+3. horloges (xo, aggre2)        } qebspil les a déjà posés
+4. régulateurs (cx, px)
+5. qcom_scm_pas_prepare_and_auth_reset()   <- à sauter, échoue en EL2
+6. attente du signal SMP2P "ready"          <- déjà émis avant que Linux n'existe
+```
+
+L'étape 6 est le vrai point dur : le DSP a signalé son démarrage bien avant que Linux ne
+soit là. qebspil le reconnaît d'ailleurs dans son propre code — *« Wait a bit to let
+remoteprocs finish handover. FIXME: Wait for the SMP2P signals instead »*.
+
+À noter : **qebspil ne modifie pas le device tree** (aucun `fdt_setprop` dans ses
+sources). Il n'existe donc aucun signal en bande — le noyau doit être informé autrement
+qu'un DSP tourne déjà : propriété DT ajoutée à la main, paramètre de module, ou détection
+matérielle.
+
+Le README de qebspil renvoie vers des branches de patchs noyau sur
+`git.codelinaro.org/stephan.gerhold/linux` (`wip/x1e80100-6.16-el2`,
+`wip/qcom-laptops-6.17-el2`) qui ne sont plus accessibles — cet utilisateur n'existe plus
+dans l'API du service. Non résolu ici.
 
 ## Diagnostiquer après `ExitBootServices`
 
