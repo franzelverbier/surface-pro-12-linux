@@ -112,7 +112,7 @@ dmesg | grep "kvm \[1\]"                # trap handlers nested
 **Aucune MSI n'est délivrée.** Tous les compteurs `ITS-PCI-MSI` restent à zéro, PME du
 root port PCIe compris ; les interruptions filaires fonctionnent. Le WiFi en est la
 victime visible : `ath12k` attend l'interruption `bhi`, expire au bout de ~90 s et
-réessaie trois fois.
+réessaie trois fois. Contournement complet plus bas : **une clé WiFi USB fonctionne**.
 
 Vérifié et écarté : SMMU stage-2 (`arm-smmu.force_stage=1`), traduction du doorbell MSI
 (`iommu.passthrough=1`), GICv4.1 (masquage de `VLPIS`/`VMAPP` dans `GITS_TYPER`),
@@ -127,6 +127,77 @@ DirectLPI, 988 SPI, 16 PPI) ; en EL2, Linux voit le matériel réel (`DS=0`,
 **Effet de bord à connaître** : les timeouts d'`ath12k` sérialisent le sondage du Surface
 Aggregator, et le clavier Type Cover n'apparaît qu'à ~327 s au lieu de ~13 s. Avec
 `modprobe.blacklist=ath12k_wifi7`, il revient en quelques secondes.
+
+### Contournement : une clé WiFi USB
+
+**Le WiFi n'est plus une impasse.** Un adaptateur USB fonctionne en EL2, parce qu'il passe
+par le contrôleur xHCI et non par le PCIe : ses interruptions sont filaires, et celles-là
+sont bien délivrées — les compteurs `xhci-hcd` s'accumulent normalement.
+
+Validé ici avec un **RTL8192CU** (`0586:341f`, ZyXEL/Realtek 802.11n) : association,
+DHCP et trafic normaux en EL2, avec `ath12k` en liste noire.
+
+Ce qu'il faut côté noyau :
+
+```
+CONFIG_RTL8XXXU=m
+CONFIG_RTL8XXXU_UNTESTED=y      # ce chip est derrière ce #ifdef
+```
+
+Le firmware (`rtlwifi/rtl8192cufw_{A,B,TMSC}.bin`) vient de `linux-firmware`, rien à
+extraire de Windows.
+
+#### Le piège : charger le module tard
+
+L'initialisation de l'étage RF **échoue si le module est chargé tôt dans le boot** :
+
+```
+usb 1-1: Firmware revision 88.2 (signature 0x88c1)
+usb 1-1: Failed to initialize RF
+usb 1-1: Failed to initialize RF
+```
+
+Chargé à 3,3 s par udev, l'init RF échoue et l'interface reste sans porteuse. Rechargé
+machine calme, elle réussit du premier coup et scanne. Ce n'est ni l'EL2 ni le chip : à
+titre de comparaison, en EL1 le module se chargeait tard, à la main, et n'a jamais sorti
+cette erreur.
+
+La parade : interdire l'autoload et charger tard, avec réessai.
+
+```
+# /etc/modprobe.d/rtl8xxxu-late.conf
+blacklist rtl8xxxu
+```
+
+```ini
+# /etc/systemd/system/usbwifi.service
+[Unit]
+Description=Charger la clé WiFi USB après le boot
+After=multi-user.target            # ordonné APRÈS la cible qui le veut,
+                                   # donc elle ne l'attend pas
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/bin/usbwifi-load
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Le script compte les `Failed to initialize RF` avant et après le `modprobe`, et recharge
+jusqu'à trois fois si l'init a échoué — plus fiable qu'une temporisation fixe.
+
+À noter : c'est le même motif que la liste noire des modules Surface Aggregator, dont la
+raison d'être n'était plus documentée. Sur cette plateforme, plusieurs pilotes supportent
+mal d'être sondés pendant la tempête d'initialisation.
+
+#### Piège de compilation
+
+Pour construire ce seul module dans un arbre déjà compilé, `make M=<dir> modules` **ne
+régénère pas** `include/generated/autoconf.h` quand `.config` a changé. Le module se relie
+sans erreur mais sans l'option — ici 33 alias au lieu de 121, notre chip absent, échec
+totalement silencieux. Il faut `make syncconfig` d'abord, et un `make modules` complet au
+moins une fois pour obtenir `Module.symvers`.
 
 **ADSP/CDSP ne démarrent pas** — `error -22 initializing firmware`. TrustZone refuse le
 service PAS dès que Linux possède EL2. Donc pas d'audio ni de décodage vidéo matériel.

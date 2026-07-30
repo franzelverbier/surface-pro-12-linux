@@ -14,7 +14,8 @@ Windows de votre propre machine (voir [Binaires propriétaires](#binaires-propri
 |---|---|
 | Écran, GPU (Adreno/mesa) | ✅ |
 | Clavier & touchpad Type Cover, tactile, stylet | ✅ |
-| WiFi (WCN7850), Bluetooth | ✅ en EL1 |
+| WiFi interne (WCN7850) | ✅ en EL1 · en EL2 : clé USB requise |
+| Bluetooth | ✅ |
 | Audio, UFS interne, batterie, veille | ✅ en EL1 |
 | **EL2 + KVM** | ✅ voir ci-dessous |
 
@@ -29,9 +30,10 @@ Deux limitations connues **en EL2** :
 
 - **Aucune MSI n'est délivrée.** Tous les compteurs `ITS-PCI-MSI` restent à zéro, y compris
   le PME du root port PCIe ; les interruptions filaires fonctionnent normalement.
-  Conséquence : pas de WiFi (le WCN7850 attend une interruption qui n'arrive jamais et
-  expire au chargement de son firmware). Contournement : `modprobe.blacklist=ath12k_wifi7`
-  et un adaptateur USB Ethernet. Remonté en amont.
+  Conséquence : le WiFi interne (WCN7850, PCIe) est inutilisable — il attend une
+  interruption qui n'arrive jamais. Remonté en amont.
+  **Contournement : une clé WiFi USB fonctionne**, l'USB passant par le contrôleur xHCI
+  et non par le PCIe. Validé avec un RTL8192CU. Voir [`EL2-KVM.md`](EL2-KVM.md).
 - **ADSP/CDSP ne démarrent pas** (`error -22`) : TrustZone refuse le chargement de
   firmware PAS dès que Linux possède EL2. Conséquence : pas d'audio ni de décodage vidéo
   matériel. Piste : [qebspil](https://github.com/stephan-gh/qebspil).
