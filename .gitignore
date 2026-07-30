@@ -1,0 +1,17 @@
+# Binaires proprietaires : non redistribuables, a extraire de sa propre machine
+graft/
+firmware/
+*.mbn
+*.bin
+board-*.bin
+amss.bin
+
+# Artefacts de compilation : la recette suffit, les binaires vieillissent
+*.ko
+*.o
+Image
+Image-*
+vmlinux
+
+# Binaires GPL sans sources : GRUB et consorts se prennent dans sa distribution
+*.efi

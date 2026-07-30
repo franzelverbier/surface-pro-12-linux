@@ -1,0 +1,30 @@
+#!/usr/bin/ash
+run_hook() {
+    msg ":: sp12live: init console + Type Cover (SAM)..."
+    sleep 3
+    for m in surface_aggregator surface_aggregator_registry surface_aggregator_hub surface_aggregator_tabletsw surface_hid_core surface_hid; do
+        if modprobe "$m" 2>/dev/null; then msg ":: SAM ok: $m"; else msg ":: SAM FAIL: $m"; fi
+        sleep 1
+    done
+    sleep 2
+    # diag sur SP12DATA (best-effort)
+    if mount -t ext4 "$(blkid -L SP12DATA)" /mnt 2>/dev/null; then
+        {
+            echo "===== SP12 LIVE DIAG ====="
+            echo "--- SAM/HID ---"; lsmod | grep -iE 'surface|hid'
+            echo "--- input devices ---"; cat /proc/bus/input/devices 2>/dev/null
+            echo "--- /dev/input ---"; ls /dev/input/ 2>/dev/null
+        } > /mnt/sp12-live-diag.txt 2>&1
+        sync; sync; umount /mnt 2>/dev/null
+    fi
+    # shell interactif visible + RE-SPAWN (jamais de panic si sortie)
+    printf '\n\n======================================\n' > /dev/tty0
+    printf '  SP12 LIVE SHELL - tape au clavier !\n'      > /dev/tty0
+    printf '  test: cat /proc/bus/input/devices\n'         > /dev/tty0
+    printf '  (Ctrl+D rouvre le shell ; reboot -f pour redemarrer)\n' > /dev/tty0
+    printf '======================================\n\n'  > /dev/tty0
+    while : ; do
+        sh <>/dev/tty0 1>&0 2>&0 || true
+        printf '\n[shell relance]\n' > /dev/tty0
+    done
+}

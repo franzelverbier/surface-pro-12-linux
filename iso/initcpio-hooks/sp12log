@@ -1,0 +1,41 @@
+#!/usr/bin/ash
+# sp12log — écrit un diagnostic de boot sur SP12DATA puis éteint (debug ISO live).
+run_hook() {
+    msg ":: sp12log: capture du diagnostic de boot..."
+    modprobe ext4 2>/dev/null
+    mkdir -p /sp12log
+    dev=""
+    i=0
+    while [ $i -lt 10 ]; do
+        dev="$(blkid -L SP12DATA 2>/dev/null)"
+        [ -n "$dev" ] && break
+        sleep 1; i=$((i+1))
+    done
+    if [ -n "$dev" ] && mount -t ext4 "$dev" /sp12log 2>/dev/null; then
+        L=/sp12log/sp12-bootlog.txt
+        {
+            echo "===== SP12 DEBUG BOOT LOG ====="
+            echo "[cmdline] $(cat /proc/cmdline)"
+            printf '[dtb-model] '; cat /proc/device-tree/model 2>/dev/null | tr -d '\000'; echo
+            echo "[uname] $(uname -a)"
+            echo "[uptime] $(cat /proc/uptime)"
+            echo "--- consoles ---"; cat /proc/consoles 2>/dev/null
+            echo "--- framebuffer ---"; cat /proc/fb 2>/dev/null; ls -la /dev/fb* 2>/dev/null
+            echo "--- DRM ---"; ls -la /dev/dri/* 2>/dev/null; ls /sys/class/drm/ 2>/dev/null
+            echo "--- modules chargés ---"; cat /proc/modules
+            echo "--- blkid ---"; blkid 2>/dev/null
+            echo "--- by-label ---"; ls -la /dev/disk/by-label/ 2>/dev/null
+            echo "--- ============ DMESG ============ ---"; dmesg
+        } > "$L" 2>&1
+        sync; sync
+        umount /sp12log 2>/dev/null
+        msg ":: sp12log: log ecrit sur SP12DATA -> /sp12-bootlog.txt"
+    else
+        msg ":: sp12log: SP12DATA introuvable, pas de log"
+    fi
+    sync
+    sleep 2
+    msg ":: sp12log: extinction..."
+    poweroff -f 2>/dev/null || busybox poweroff -f 2>/dev/null || { echo 1 > /proc/sys/kernel/sysrq 2>/dev/null; echo o > /proc/sysrq-trigger 2>/dev/null; }
+    sleep 5
+}

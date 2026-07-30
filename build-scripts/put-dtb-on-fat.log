@@ -1,0 +1,11 @@
+﻿--- start ---
+VTOYEFI monte sur X:
+copie: 1 fichiers dtb
+  grub
+  ventoy
+  EFI
+  tool
+  ENROLL_THIS_KEY_IN_MOKMANAGER.cer
+  dtb
+  sp12.dtb
+--- done OK ---
