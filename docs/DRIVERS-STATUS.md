@@ -96,7 +96,7 @@ Source : [drivers/platform/surface/Kconfig](https://github.com/torvalds/linux/bl
 
 **Passe 1 (modules `=m`) :** chaîne SAM chargée à la main → EC répond (fw 14.103.139), clavier+touchpad détectés → **crash à la première frappe**. Indice clé dans le dmesg : « Microsoft Surface **POS** Tablet Mode Switch ».
 
-**Passe 2 — la cause, trouvée dans les archives git de harrison :** son repo a eu un dossier `/patches` (commits "add forward patches" → "remove patches") récupéré au commit `52eab23f794a` et **archivé ici dans `patches-harrison/`**. Le patch `0001` (registre SAM testé "Keyboard ✓") **diffère de ce qui a été intégré dans linux-next 20260626** sur 3 nœuds du groupe `ssam_node_group_sp12in[]` :
+**Passe 2 — la cause, trouvée dans les archives git de harrison :** son repo a eu un dossier `/patches` (commits "add forward patches" → "remove patches") récupéré au commit `52eab23f794a` et **archivé ici dans `patches/`**. Le patch `0001` (registre SAM testé "Keyboard ✓") **diffère de ce qui a été intégré dans linux-next 20260626** sur 3 nœuds du groupe `ssam_node_group_sp12in[]` :
 | Nœud | Harrison (testé ✓) | Upstream (crashait) |
 |---|---|---|
 | penstash | `hid_kip_penstash` | `hid_sam_penstash` |
