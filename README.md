@@ -17,7 +17,11 @@ Windows de votre propre machine (voir [Binaires propriétaires](#binaires-propri
 | WiFi interne (WCN7850) | ✅ |
 | Bluetooth | ✅ |
 | Audio | ✅ (en EL2 : voir ci-dessous) |
-| UFS interne, batterie, veille | ✅ |
+| UFS interne, batterie | ✅ |
+| Décodage vidéo matériel (iris) | ✅ en EL1 · ❌ **en EL2** — `iris` est mis à `disabled` dans le DTS EL2, il ne survit pas à la bascule. Aucun `/dev/video*` |
+| Caméras | ❌ |
+| TPM | ❌ non exposé à Linux |
+| Veille / reprise | ❌ — `sleep.target` et `suspend.target` sont masqués. Snapdragon ne reprend pas ; masquer évite un gel au rabat de l'écran |
 | **EL2 + KVM** | ✅ voir ci-dessous |
 
 ### EL2 et KVM
