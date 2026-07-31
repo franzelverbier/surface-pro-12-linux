@@ -82,7 +82,7 @@ network={
     psk="<REDACTED>"
 }
 ```
-  - **Un seul SSID `<REDACTED>`** (2.4 GHz + 5 GHz regroupés dessous). Le bloc `<REDACTED-OBSOLETE>` est **obsolète → à supprimer.**
+  - **Un seul SSID `<REDACTED>`** (2.4 GHz + 5 GHz regroupés dessous). Le second bloc réseau, `<REDACTED-OBSOLETE>`, est **obsolète → à supprimer.**
   - WPA2-`psk` suffit. Option WPA3 si besoin : ajouter `key_mgmt=WPA-PSK SAE` + `ieee80211w=1`.
 
 **Firmware WiFi ath12k** (sinon `wlan0` ne monte pas) :

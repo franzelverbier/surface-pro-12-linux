@@ -24,7 +24,7 @@ if ! grep -q '^IgnorePkg' "$ROOT/etc/pacman.conf"; then
 fi
 grep '^IgnorePkg' "$ROOT/etc/pacman.conf"
 
-echo "=== e) wpa : un seul SSID <REDACTED> (retire le bloc obsolete '<REDACTED>') ==="
+echo "=== e) wpa : un seul SSID <REDACTED> (retire le second bloc, obsolete) ==="
 cat > "$ROOT/etc/wpa_supplicant/wpa_supplicant-wlan0.conf" <<'EOF'
 ctrl_interface=/run/wpa_supplicant
 update_config=1
