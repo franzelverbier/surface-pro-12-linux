@@ -1,0 +1,50 @@
+From 1b3db34688cc43800b4191545e44712d8c6fce09 Mon Sep 17 00:00:00 2001
+From: franzelverbier <40312973+franzelverbier@users.noreply.github.com>
+Date: Wed, 29 Jul 2026 14:46:54 +0200
+Subject: [PATCH 02/16] irqchip/gic-v3-its: add irqchip.its_nov4 to mask GICv4
+ capability
+
+Masking GITS_TYPER VLPIS/VMAPP at probe is what actually forces the ITS
+back to GICv3 table layouts. The earlier irqchip.gicv3_nov4 knob only
+cleared rdists->has_vlpis, which gates the vPE irqdomain and leaves the
+ITS allocating GICv4.1-format tables (64K pages, esz 2 collections).
+---
+ drivers/irqchip/irq-gic-v3-its.c | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
+
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index b57d81ad3..11ebd3e3c 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -178,6 +178,14 @@ struct its_device {
+ 	bool			shared;
+ };
+ 
++static bool its_nov4;
++
++static int __init its_nov4_cfg(char *buf)
++{
++	return kstrtobool(buf, &its_nov4);
++}
++early_param("irqchip.its_nov4", its_nov4_cfg);
++
+ static struct {
+ 	raw_spinlock_t		lock;
+ 	struct its_device	*dev;
+@@ -5522,6 +5530,16 @@ static struct its_node __init *its_node_init(struct resource *res,
+ 	INIT_LIST_HEAD(&its->its_device_list);
+ 
+ 	its->typer = gic_read_typer(its_base + GITS_TYPER);
++
++	/*
++	 * Let the GICv4/v4.1 capability be masked out from the command line.
++	 * Clearing VLPIS/VMAPP here (rather than rdists->has_vlpis, which only
++	 * gates the vPE irqdomain KVM uses) is what actually puts the ITS back
++	 * into GICv3 table layouts -- notably esz 1 interrupt collections
++	 * instead of esz 2.
++	 */
++	if (its_nov4)
++		its->typer &= ~(GITS_TYPER_VLPIS | GITS_TYPER_VMAPP);
+ 	its->base = its_base;
+ 	its->phys_base = res->start;
+ 	its->get_msi_base = its_irq_get_msi_base;

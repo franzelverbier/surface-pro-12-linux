@@ -1,0 +1,43 @@
+From 048222c2bb6b71e50a9c3db80a75e35d230e3bc6 Mon Sep 17 00:00:00 2001
+From: franzelverbier <40312973+franzelverbier@users.noreply.github.com>
+Date: Wed, 29 Jul 2026 14:30:50 +0200
+Subject: [PATCH 01/16] irqchip/gic-v3: add irqchip.gicv3_nov4 to disable
+ GICv4.x features
+
+On x1p42100 booted at EL2 via slbounce, Linux discovers GICv4.1 (hidden by
+Gunyah at EL1) and enables it. No ITS MSI is ever delivered afterwards --
+every ITS-PCI-MSI counter stays at zero, including the PCIe root port PME,
+while wired interrupts work fine. Provide a knob to fall back to GICv3 mode
+so the hypothesis can be tested without rebuilding.
+---
+ drivers/irqchip/irq-gic-v3.c | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+index 99444a1b2..f3e550300 100644
+--- a/drivers/irqchip/irq-gic-v3.c
++++ b/drivers/irqchip/irq-gic-v3.c
+@@ -1264,6 +1264,14 @@ static int __init gicv3_nolpi_cfg(char *buf)
+ }
+ early_param("irqchip.gicv3_nolpi", gicv3_nolpi_cfg);
+ 
++static bool gicv3_nov4;
++
++static int __init gicv3_nov4_cfg(char *buf)
++{
++	return kstrtobool(buf, &gicv3_nov4);
++}
++early_param("irqchip.gicv3_nov4", gicv3_nov4_cfg);
++
+ static int gic_dist_supports_lpis(void)
+ {
+ 	return (IS_ENABLED(CONFIG_ARM_GIC_V3_ITS) &&
+@@ -2019,7 +2027,7 @@ static int __init gic_init_bases(phys_addr_t dist_phys_base,
+ 	gic_data.domain = irq_domain_create_tree(handle, &gic_irq_domain_ops,
+ 						 &gic_data);
+ 	gic_data.rdists.rdist = alloc_percpu(typeof(*gic_data.rdists.rdist));
+-	if (!static_branch_unlikely(&gic_nvidia_t241_erratum)) {
++	if (!static_branch_unlikely(&gic_nvidia_t241_erratum) && !gicv3_nov4) {
+ 		/* Disable GICv4.x features for the erratum T241-FABRIC-4 */
+ 		gic_data.rdists.has_rvpeid = true;
+ 		gic_data.rdists.has_vlpis = true;

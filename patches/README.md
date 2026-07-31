@@ -7,7 +7,8 @@ d'origine ; voir le README racine pour la licence.
 |---|---|---|
 | `0001` … `0006` | SAM, panneau eDP BOE, ASoC, qcom-scm, DTS SP12 | Harrison van der Byl |
 | `0007` | panneau eDP Sharp SHP 0x15a7 (voir plus bas) | ce dépôt |
-| `audio-el2-serie.md` | manifeste des 14 patchs remoteproc « attach » pour l'audio en EL2 | Stephan Gerhold (miroir) |
+| `serie-complete/` | **les 16 patchs** séparant le noyau de référence de `next-20260626` — source correspondante complète | mixte, paternité préservée |
+| `audio-el2-serie.md` | notes sur la série remoteproc « attach » : mécanisme, pièges, avertissement ABI | Stephan Gerhold (miroir) |
 | `registry-next20260626.c` | table de registre SAM | Harrison van der Byl |
 
 ## `0007` — le panneau eDP du Surface Pro 12
