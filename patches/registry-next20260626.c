@@ -421,15 +421,40 @@ static const struct software_node *ssam_node_group_sp11[] = {
 };
 
 /* Devices for Surface Pro 12" first edition (ARM/QCOM) */
+/*
+ * Surface Pro 12in 1st Edition (x1p42100). Chaque entree correspond a un
+ * peripherique dont la presence a ete verifiee sur la machine : lie a un pilote,
+ * ou declare sans erreur. Les nœuds suivants ont ete retires apres constat --
+ * SAM renvoie un descripteur HID vide (-EPROTO), y compris sur un rebind manuel
+ * a systeme au repos, donc ce n'est pas une question de timing :
+ *   ssam_node_hid_kip_penstash   01:15:02:02:00
+ *   ssam_node_hid_sam_sensors    01:15:01:06:00
+ * ssam_node_hid_sam_penstash (01:15:01:02:00) et ssam_node_pos_tablet_switch
+ * (01:26:01:00:01) ne sont pas repris : jamais instancies ici, donc jamais
+ * verifies. Le detecteur de mode tablette effectivement fonctionnel est
+ * ssam_node_kip_tablet_switch (01:0e:01:00:01).
+ */
 static const struct software_node *ssam_node_group_sp12in[] = {
 	&ssam_node_root,
 	&ssam_node_hub_kip,
 	&ssam_node_tmp_sensors,
 	&ssam_node_hid_kip_keyboard,
-	&ssam_node_hid_sam_penstash,
 	&ssam_node_hid_kip_touchpad,
 	&ssam_node_hid_kip_fwupd,
-	&ssam_node_pos_tablet_switch,
+	&ssam_node_kip_tablet_switch,
+	NULL,
+};
+
+static const struct software_node *ssam_node_group_sp12[] = {
+	&ssam_node_root,
+	&ssam_node_hub_kip,
+	&ssam_node_tmp_sensors,
+	&ssam_node_hid_kip_keyboard,
+	&ssam_node_hid_kip_penstash,
+	&ssam_node_hid_kip_touchpad,
+	&ssam_node_hid_kip_fwupd,
+	&ssam_node_hid_sam_sensors,
+	&ssam_node_kip_tablet_switch,
 	NULL,
 };
 
@@ -511,6 +536,7 @@ static const struct of_device_id ssam_platform_hub_of_match[] __maybe_unused = {
 	{ .compatible = "microsoft,arcata", (void *)ssam_node_group_sp9_5g },
 	/* Surface Pro 11 (ARM/QCOM) */
 	{ .compatible = "microsoft,denali", (void *)ssam_node_group_sp11 },
+	{ .compatible = "microsoft,sp12", (void *)ssam_node_group_sp12 },
 	/* Surface Pro 12in First Edition (ARM/QCOM) */
 	{ .compatible = "microsoft,surface-pro-12in", (void *)ssam_node_group_sp12in },
 	/* Surface Laptop 7 */

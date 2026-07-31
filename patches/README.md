@@ -36,6 +36,49 @@ faudrait activer `CONFIG_DRM_DP_AUX_CHARDEV` et relire l'EDID via `/dev/drm_dp_a
 issue d'une fiche technique** : un `enable` plus court passerait probablement, mais ça n'a
 pas été validé ici. En cas d'artefact à la reprise de veille, remonter les délais.
 
+## `registry-next20260626.c` — le registre SAM
+
+Table des nœuds `software_node` décrivant les périphériques exposés par le Surface
+Aggregator. C'est elle qui décide de ce que Linux tente d'instancier.
+
+**Le compatible qui compte est `microsoft,surface-pro-12in`** — c'est ce qu'annonce la
+machine (`/proc/device-tree/compatible`). Le fichier contient aussi un
+`ssam_node_group_sp12` associé au compatible `microsoft,sp12`, que ce modèle n'annonce
+jamais : ce groupe est **du code mort**, il ne sert à rien de l'éditer. Piège coûteux —
+c'est le groupe qu'on modifie spontanément parce qu'il porte le bon nom.
+
+Le groupe `ssam_node_group_sp12in` a été ramené à ce qui est **observable sur la
+machine** :
+
+| UID | Nœud | État constaté |
+|---|---|---|
+| `00:00:01:0e:00` | `hub_kip` | lié à `surface_aggregator_subsystem_hub` |
+| `01:03:01:00:02` | `tmp_sensors` | déclaré, sans erreur (pilote non compilé) |
+| `01:15:02:01:00` | `hid_kip_keyboard` | lié à `surface_hid` |
+| `01:15:02:03:00` | `hid_kip_touchpad` | lié à `surface_hid` |
+| `01:15:02:05:00` | `hid_kip_fwupd` | lié à `surface_hid` |
+| `01:0e:01:00:01` | `kip_tablet_switch` | lié, entrée « KIP Tablet Mode Switch » créée |
+
+Retirés : `hid_kip_penstash` (`01:15:02:02:00`) et `hid_sam_sensors`
+(`01:15:01:06:00`). SAM leur renvoie un descripteur HID vide (`-EPROTO`), y compris sur
+un **rebind manuel à système au repos** — le test qui prouve qu'il ne s'agit pas d'une
+course au démarrage :
+
+```bash
+echo 01:15:02:02:00 | sudo tee /sys/bus/surface_aggregator/drivers/surface_hid/bind
+```
+
+Non repris non plus : `hid_sam_penstash` (`01:15:01:02:00`) et `pos_tablet_switch`
+(`01:26:01:00:01`), présents dans la version amont de ce groupe. Ils n'ont jamais été
+instanciés ici, donc jamais vérifiés — et le détecteur de mode tablette effectivement
+fonctionnel est `kip_tablet_switch`. Les adopter reviendrait à troquer un composant qui
+marche contre un pari.
+
+⚠️ Le module installé provenait d'une compilation **extérieure** (GCC 13.3 sous Ubuntu,
+arbre `/root/linux-next`) : ses chaînes le trahissent, et son groupe `sp12in` ne
+correspondait pas à celui du même nom dans linux-next. Vérifier la provenance d'un
+module hors-arbre avant d'en déduire quoi que ce soit de la lecture des sources.
+
 ## ⚠️ Le module vit aussi dans l'initramfs
 
 Recompiler et installer `panel-edp.ko` dans `/lib/modules` **ne suffit pas**. Le hook `kms`

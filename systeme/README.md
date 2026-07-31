@@ -49,6 +49,28 @@ Plusieurs unités portent `After=multi-user.target` : elles sont ordonnées **ap
 cible qui les réclame, donc celle-ci ne les attend pas. C'est ce qui garde le chemin
 critique court alors que ces services prennent plusieurs secondes.
 
+## `loglevel` par entrée
+
+L'entrée d'usage courant utilise **`loglevel=3`** : la console n'affiche que les erreurs.
+Ce n'est pas une façon de cacher la poussière — les 42 avertissements masqués ont été
+identifiés un par un et sont bénins :
+
+- **24 lignes** `qcom-pcie … supply vdda / vddpe-3v3 not found, using dummy regulator`.
+  Ces alimentations sont réellement absentes de ce design : le DTS officiel amont
+  (`x1p42100-microsoft-sp12.dts`) ne les déclare pas davantage, et le WiFi tire les
+  siennes des `vddrfa*`/`vddpcie*` du nœud `wifi@0`. Les 12 répétitions par alimentation
+  viennent des reprises de sondage différé. Attention : d'autres cartes x1e déclarent
+  bien `vddpe-3v3-supply`, mais sur `&pcie6a` (connecteur NVMe) — pas sur le `pcie4` du
+  WiFi. Ne pas s'y laisser prendre.
+- le reste : régulateurs optionnels absents (`adreno`, `i2c_hid_of`, `wcn7850-pmu`),
+  messages informatifs (`clk: Not disabling unused clocks`, `Zap shader not enabled`),
+  quirks du firmware (`[Firmware Bug]` psci, arch_timer).
+
+Rien n'est perdu : `dmesg`, le journal et `sp12-bootreport` capturent toujours tout. Un
+écran réduit à 7 lignes rend au contraire une anomalie nouvelle immédiatement visible,
+alors qu'elle se noyait dans le bruit. Les entrées « verbeux / debug » et « Rescue »
+gardent `loglevel=7`.
+
 ## `modules-load.d/cdrecord.conf`
 
 Surcharge vide masquant `/usr/lib/modules-load.d/cdrecord.conf`, qui réclame le module
