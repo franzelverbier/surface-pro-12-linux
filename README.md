@@ -14,9 +14,10 @@ Windows de votre propre machine (voir [Binaires propriétaires](#binaires-propri
 |---|---|
 | Écran, GPU (Adreno/mesa) | ✅ |
 | Clavier & touchpad Type Cover, tactile, stylet | ✅ |
-| WiFi interne (WCN7850) | ✅ en EL1 · en EL2 : clé USB requise |
+| WiFi interne (WCN7850) | ✅ |
 | Bluetooth | ✅ |
-| Audio, UFS interne, batterie, veille | ✅ en EL1 |
+| Audio | ✅ (en EL2 : voir ci-dessous) |
+| UFS interne, batterie, veille | ✅ |
 | **EL2 + KVM** | ✅ voir ci-dessous |
 
 ### EL2 et KVM
@@ -26,17 +27,21 @@ La machine démarre **en EL2 avec `/dev/kvm` fonctionnel**, via
 c'est le premier Surface Pro 12 documenté dans cet état — le seul autre rapport public sur
 X1P42100 concerne une carte de référence.
 
-Deux limitations connues **en EL2** :
+Les deux limitations qui rendaient l'EL2 pénible sont résolues. Elles méritent d'être
+racontées, parce que dans les deux cas la cause n'était pas là où elle en avait l'air.
 
-- **Aucune MSI n'est délivrée.** Tous les compteurs `ITS-PCI-MSI` restent à zéro, y compris
-  le PME du root port PCIe ; les interruptions filaires fonctionnent normalement.
-  Conséquence : le WiFi interne (WCN7850, PCIe) est inutilisable — il attend une
-  interruption qui n'arrive jamais. Remonté en amont.
-  **Contournement : une clé WiFi USB fonctionne**, l'USB passant par le contrôleur xHCI
-  et non par le PCIe. Validé avec un RTL8192CU. Voir [`EL2-KVM.md`](EL2-KVM.md).
-- **ADSP/CDSP ne démarrent pas** (`error -22`) : TrustZone refuse le chargement de
-  firmware PAS dès que Linux possède EL2. Conséquence : pas d'audio ni de décodage vidéo
-  matériel. Piste : [qebspil](https://github.com/stephan-gh/qebspil).
+- **WiFi interne** — les MSI ne parvenaient jamais : tous les compteurs `ITS-PCI-MSI`
+  restaient à zéro, PME du root port compris. La cause était dans **notre propre DTS** :
+  le SMMUv3 du PCIe (`iommu@15400000`) était laissé en `status = "reserved"`. Le passer à
+  `"okay"` suffit. Attention au faux négatif qui nous a coûté des jours :
+  `arm-smmu.force_stage=1` ne concerne que le SMMUv1/v2 (`apps_smmu`) et **ne touche pas**
+  le SMMUv3 — un test avec ce paramètre n'écarte rien.
+- **Audio (ADSP/CDSP)** — `error -22 initializing firmware` : TrustZone refuse le
+  chargement de firmware PAS dès que Linux possède EL2. La solution ne consiste pas à
+  forcer le chargement, mais à **démarrer les DSP avant** que Linux ne prenne EL2, puis à
+  s'y rattacher : [qebspil](https://github.com/stephan-gh/qebspil) les lance depuis l'UEFI
+  avant `ExitBootServices`, et une série de patchs remoteproc hors-arbre permet au noyau
+  de faire `attach` au lieu de `start`. Détail complet dans [`EL2-KVM.md`](EL2-KVM.md).
 
 Deux modifications de slbounce sont nécessaires sur ce firmware, dont la suppression du
 balayage de cache global qui fait tomber la machine. Mode d'emploi complet, diagnostic et
@@ -48,7 +53,7 @@ limitations : **[`EL2-KVM.md`](EL2-KVM.md)**.
 |---|---|
 | [`EL2-KVM.md`](EL2-KVM.md) | démarrer en EL2 avec KVM : prérequis, correctifs slbounce, limites |
 | `kernel/` | recette de reconstruction, `.config`, DTS sources et DTB |
-| `patches/` | patchs SP12 sur linux-next (SAM, panel eDP, ASoC, qcom-scm, DTS) |
+| `patches/` | patchs SP12 sur linux-next (SAM, panel eDP, ASoC, qcom-scm, DTS) — voir [`patches/README.md`](patches/README.md) |
 | `iso/` | construction de l'ISO live et de l'installateur |
 | `build-scripts/` | étapes de construction du rootfs |
 | `scripts/` | sauvegarde, vérification d'artefacts, outils Windows (GPT, écriture disque) |

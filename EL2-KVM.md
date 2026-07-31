@@ -107,32 +107,50 @@ ls -l /dev/kvm
 dmesg | grep "kvm \[1\]"                # trap handlers nested
 ```
 
-## Limitations connues en EL2
+## Le WiFi interne : un SMMUv3 laissé en « reserved »
 
-**Aucune MSI n'est délivrée.** Tous les compteurs `ITS-PCI-MSI` restent à zéro, PME du
-root port PCIe compris ; les interruptions filaires fonctionnent. Le WiFi en est la
-victime visible : `ath12k` attend l'interruption `bhi`, expire au bout de ~90 s et
-réessaie trois fois. Contournement complet plus bas : **une clé WiFi USB fonctionne**.
+Pendant longtemps, **aucune MSI n'était délivrée** en EL2 : tous les compteurs
+`ITS-PCI-MSI` restaient à zéro, PME du root port PCIe compris, alors que les interruptions
+filaires fonctionnaient. `ath12k` attendait l'interruption `bhi`, expirait au bout de ~90 s
+et réessayait trois fois.
 
-Vérifié et écarté : SMMU stage-2 (`arm-smmu.force_stage=1`), traduction du doorbell MSI
-(`iommu.passthrough=1`), GICv4.1 (masquage de `VLPIS`/`VMAPP` dans `GITS_TYPER`),
-chargement tardif du module. Registres relus sur machine vivante : `GITS_CTLR=1`,
-`GICR_CTLR` `EnableLPIs=1`, tables installées, endpoint programmé sur le bon
-`GITS_TRANSLATER` — toute la chaîne est correcte et rien n'arrive.
+**La cause était dans notre propre DTS** : le SMMUv3 du PCIe, `iommu@15400000`, était laissé
+en `status = "reserved"`. Il suffit de le passer à `"okay"` :
 
-Différence établie : en EL1, Gunyah présentait un GIC **synthétique** (`GICD_CTLR.DS=1`,
-DirectLPI, 988 SPI, 16 PPI) ; en EL2, Linux voit le matériel réel (`DS=0`,
-`SCR_EL3.FIQ=1`, pas de DirectLPI, 960 SPI, 1024 ESPI, 48 PPI, GICv4.1). Remonté en amont.
+```
+pcie_smmu: iommu@15400000 {
+        status = "okay";        /* etait "reserved" */
+};
+```
 
-**Effet de bord à connaître** : les timeouts d'`ath12k` sérialisent le sondage du Surface
-Aggregator, et le clavier Type Cover n'apparaît qu'à ~327 s au lieu de ~13 s. Avec
-`modprobe.blacklist=ath12k_wifi7`, il revient en quelques secondes.
+Les compteurs passent de 0 à plusieurs milliers, et le WiFi interne fonctionne normalement.
 
-### Contournement : une clé WiFi USB
+### Le faux négatif qui a coûté des jours
 
-**Le WiFi n'est plus une impasse.** Un adaptateur USB fonctionne en EL2, parce qu'il passe
-par le contrôleur xHCI et non par le PCIe : ses interruptions sont filaires, et celles-là
-sont bien délivrées — les compteurs `xhci-hcd` s'accumulent normalement.
+Nous avions « écarté » le SMMU en testant `arm-smmu.force_stage=1` — sans effet, donc
+conclusion : ce n'est pas le SMMU. **C'était faux.** Ce paramètre appartient au pilote
+SMMUv1/v2 (`arm-smmu.c`, l'`apps_smmu`) ; le PCIe passe par le SMMUv3 (`arm-smmu-v3.c`),
+qui n'a pas ce paramètre du tout. Le test ne touchait jamais le composant incriminé.
+
+Morale, valable bien au-delà d'ici : une hypothèse n'est écartée que si l'on a vérifié que
+le levier actionné agit réellement sur le composant visé. Le reste du temps, on ne fait
+qu'ajouter une fausse certitude à la liste.
+
+Restent vraies, et utiles à qui compare EL1 et EL2 : en EL1, Gunyah présentait un GIC
+**synthétique** (`GICD_CTLR.DS=1`, DirectLPI, 988 SPI, 16 PPI) ; en EL2, Linux voit le
+matériel réel (`DS=0`, `SCR_EL3.FIQ=1`, pas de DirectLPI, 960 SPI, 1024 ESPI, 48 PPI,
+GICv4.1). Cette différence est réelle mais n'était pas la cause.
+
+**Effet de bord observé à l'époque** : les timeouts d'`ath12k` sérialisaient le sondage du
+Surface Aggregator, et le clavier Type Cover n'apparaissait qu'à ~327 s au lieu de ~13 s.
+
+### Repli : une clé WiFi USB
+
+Plus nécessaire depuis le correctif ci-dessus, mais conservé — c'est le repli si le PCIe
+pose problème, et le piège de chargement tardif vaut pour n'importe quelle clé Realtek.
+
+Un adaptateur USB passe par le contrôleur xHCI et non par le PCIe : ses interruptions sont
+filaires, et celles-là étaient délivrées même quand les MSI ne l'étaient pas.
 
 Validé ici avec un **RTL8192CU** (`0586:341f`, ZyXEL/Realtek 802.11n) : association,
 DHCP et trafic normaux en EL2, avec `ath12k` en liste noire.
@@ -199,10 +217,18 @@ sans erreur mais sans l'option — ici 33 alias au lieu de 121, notre chip absen
 totalement silencieux. Il faut `make syncconfig` d'abord, et un `make modules` complet au
 moins une fois pour obtenir `Module.symvers`.
 
-**ADSP/CDSP ne démarrent pas** — `error -22 initializing firmware`. TrustZone refuse le
-service PAS dès que Linux possède EL2. Donc pas d'audio ni de décodage vidéo matériel.
+## Audio en EL2 : démarrer les DSP avant Linux, puis s'y rattacher
 
-### qebspil : la moitié amont fonctionne
+Symptôme de départ : `error -22 initializing firmware`, ADSP et CDSP `offline`, pas
+d'audio ni de décodage vidéo matériel. TrustZone refuse le service PAS dès que Linux
+possède EL2 — et il n'y a rien à négocier de ce côté.
+
+La solution ne consiste donc pas à faire aboutir le chargement, mais à **démarrer les DSP
+pendant qu'on est encore en EL1**, avant la bascule, puis à demander au noyau de s'y
+rattacher au lieu de les démarrer. Deux moitiés : qebspil côté UEFI, une série de patchs
+remoteproc côté noyau.
+
+### Première moitié : qebspil
 
 [qebspil](https://github.com/stephan-gh/qebspil) démarre les co-processeurs en EL1, juste
 avant `ExitBootServices`. **Il fonctionne sur x1p42100**, ce que sa liste de plateformes
@@ -210,8 +236,10 @@ ne laissait pas espérer — elle ne mentionne que SC7180, SC8280XP et X1E. Aucu
 modification de code n'a été nécessaire : le X1P42100 réutilise les compatibles X1E
 (`qcom,x1e80100-adsp-pas` et `-cdsp-pas`), déjà présents dans sa table `pil-types.c`.
 
-Il faut le compiler avec `QEBSPIL_ALWAYS_START=1`, notre device tree ne portant pas la
-propriété `qcom,broken-reset` sur laquelle il se restreint par défaut. Les firmwares vont
+Il faut le compiler avec `QEBSPIL_ALWAYS_START=1`. Par défaut, qebspil ne démarre que les
+remoteprocs portant `qcom,broken-reset` — et cette propriété, nous l'ajoutons au DTB que
+GRUB charge, donc **bien après** que qebspil se soit exécuté : il ne la voit jamais. Les
+deux moitiés ont besoin de l'information, chacune par son propre canal. Les firmwares vont
 dans `/firmware/` à la racine de la même partition que le binaire, sous le chemin donné
 par `firmware-name` dans le DT.
 
@@ -229,38 +257,82 @@ démarrage: qcom,x1e80100-cdsp-pas
 pil_finish_all: Success
 ```
 
-### Ce qui manque encore : le côté noyau
+### Seconde moitié : les patchs noyau
 
 Les DSP tournent, mais Linux l'ignore et tente quand même le chargement PAS, qui échoue.
-`drivers/remoteproc/qcom_q6v5_pas.c` ne connaît qu'un seul scénario — charger le firmware
-lui-même. Il n'expose pas d'opération `.attach` et ne place jamais le rproc dans l'état
-`RPROC_DETACHED`, alors que le cœur de remoteproc sait le faire (`rproc_attach()`,
-`RPROC_DETACHED`, utilisés par les pilotes i.MX, STM32 et TI).
+`qcom_q6v5_pas.c` d'origine ne connaît qu'un seul scénario — charger le firmware lui-même.
 
-Un `.attach` devrait reprendre `qcom_pas_start()` en sautant l'authentification PAS :
+**qebspil ne modifie pas le device tree** (aucun `fdt_setprop` dans ses sources) : il
+n'existe aucun signal en bande, le noyau doit être informé autrement.
+
+Le README de qebspil renvoie vers `git.codelinaro.org/stephan.gerhold/linux`
+(`wip/x1e80100-6.16-el2`, `wip/qcom-laptops-6.17-el2`), qui n'est plus accessible — cet
+utilisateur n'existe plus dans l'API du service. Les patchs se retrouvent dans le miroir
+[`jglathe/linux_ms_dev_kit`](https://github.com/jglathe/linux_ms_dev_kit).
+
+Série de 14 patchs, dans l'ordre : six sur `soc/qcom/smp2p` (dont *Take over outgoing SMEM
+items from boot firmware* et *Add support for `irq_get_irqchip_state()`*), un sur le cœur
+remoteproc (*Allow restarting detached remoteprocs*), et sept sur `qcom_q6v5*` (`.attach`,
+détection de l'état détaché au boot, `qcom,broken-reset`).
+
+Le mécanisme tient en deux points :
+
+- la propriété DT **`qcom,broken-reset`** sur les nœuds remoteproc fait choisir
+  `qcom_pas_ops_no_reset`, qui possède `.attach` mais **ni `.start` ni `.load` ni
+  `.parse_fw`** — le SMC PAS qui renvoie `-22` n'est donc jamais appelé ;
+- l'état « déjà démarré » est détecté en lisant le niveau des lignes d'interruption SMP2P
+  via `qcom_q6v5_read_smp2p_state()`. C'était le point dur : le DSP a signalé son
+  démarrage bien avant que Linux n'existe, donc attendre l'interruption ne pouvait pas
+  marcher — il faut lire son **niveau**, pas son front.
+
+### Trois pièges rencontrés
+
+**Le patch DTS amont ne suffit pas si vous gardez votre propre DTB.** Le patch
+`arm64: dts: qcom: x1-el2: Add qcom,broken-reset` ne touche que l'overlay `x1-el2.dtso`.
+Avec un DTS fait main, il faut ajouter la propriété soi-même sur les deux nœuds :
 
 ```
-1. qcom_q6v5_prepare()          handshake / IRQ
-2. domaines de puissance proxy  } inoffensifs, votes comptés en référence,
-3. horloges (xo, aggre2)        } qebspil les a déjà posés
-4. régulateurs (cx, px)
-5. qcom_scm_pas_prepare_and_auth_reset()   <- à sauter, échoue en EL2
-6. attente du signal SMP2P "ready"          <- déjà émis avant que Linux n'existe
+remoteproc_adsp: remoteproc@6800000  { qcom,broken-reset; ... };
+remoteproc_cdsp: remoteproc@32300000 { qcom,broken-reset; ... };
 ```
 
-L'étape 6 est le vrai point dur : le DSP a signalé son démarrage bien avant que Linux ne
-soit là. qebspil le reconnaît d'ailleurs dans son propre code — *« Wait a bit to let
-remoteprocs finish handover. FIXME: Wait for the SMP2P signals instead »*.
+**Le patch `Set correct owner for SCM SHM bridge` est à écarter** dans ce contexte : il
+ajoute `#include <dt-bindings/firmware/qcom,scm.h>` pour `QCOM_SCM_VMID_SELF_OWNER`, une
+constante qui n'existe pas dans linux-next et dont le code consommateur
+(`shm-bridge-vmid`) est absent. Il dépend d'autres correctifs de la même série. Le
+reporter dans un DTS aplati casse simplement la compilation.
 
-À noter : **qebspil ne modifie pas le device tree** (aucun `fdt_setprop` dans ses
-sources). Il n'existe donc aucun signal en bande — le noyau doit être informé autrement
-qu'un DSP tourne déjà : propriété DT ajoutée à la main, paramètre de module, ou détection
-matérielle.
+**⚠️ ABI des modules — le piège silencieux.** Le patch sur le cœur remoteproc change
+`bool auto_boot` en `enum rproc_auto_boot` dans `struct rproc`. Le champ passe de 1 à
+4 octets alignés : la structure **grandit de 8 octets** et tout ce qui suit est décalé.
+`CONFIG_REMOTEPROC=y` étant intégré au noyau, un module `qcom_q6v5_pas.ko` neuf chargé par
+une **ancienne** `Image` écrit alors au-delà de la structure allouée. Sans
+`CONFIG_MODVERSIONS`, rien ne l'empêche et aucun message n'apparaît.
 
-Le README de qebspil renvoie vers des branches de patchs noyau sur
-`git.codelinaro.org/stephan.gerhold/linux` (`wip/x1e80100-6.16-el2`,
-`wip/qcom-laptops-6.17-el2`) qui ne sont plus accessibles — cet utilisateur n'existe plus
-dans l'API du service. Non résolu ici.
+Or plusieurs `Image` partageant la même version de noyau partagent aussi `/lib/modules` :
+il n'existe aucune sélection de modules par image. Deux issues seulement — changer
+`CONFIG_LOCALVERSION` pour obtenir un arbre de modules distinct, ou ajouter
+`modprobe.blacklist=qcom_q6v5_pas` à **toutes** les autres entrées du menu. Ici la seconde,
+les modules Surface Aggregator hors-arbre étant figés sur la version courante.
+
+### Vérifier
+
+```bash
+cat /sys/class/remoteproc/remoteproc*/state    # attendu : attached
+cat /proc/asound/cards
+dmesg | grep -c "error -22 initializing firmware"   # attendu : 0
+```
+
+Résultat obtenu ici, en EL2 avec KVM :
+
+```
+remoteproc remoteproc0: attaching to adsp
+remoteproc remoteproc0: remote processor adsp is now attached
+remoteproc remoteproc1: attaching to cdsp
+remoteproc remoteproc1: remote processor cdsp is now attached
+
+ 0 [X1P42100Microso]: x1e80100 - X1P42100-Microsoft-Surface-Pro-
+```
 
 ## Diagnostiquer après `ExitBootServices`
 

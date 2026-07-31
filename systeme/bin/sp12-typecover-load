@@ -1,0 +1,42 @@
+#!/bin/sh
+# Charge les modules Surface Aggregator (clavier / touchpad Type Cover).
+#
+# Remplace deux "sleep 1" en aveugle par une attente de condition réelle.
+# Le délai de garde (3 s) est PLUS LONG que l'ancien sleep : en cas d'anomalie
+# on attend davantage, jamais moins, et on poursuit quand même.
+#
+# Ces modules sont en liste noire dans blacklist-surface-sam.conf : seul ce
+# modprobe explicite les charge. Ne pas remplacer par modules-load.d, qui
+# respecte la liste noire et resterait donc sans effet.
+set -e
+
+sam_pret() {
+    ls -l /sys/bus/serial/devices/serial*-0/driver 2>/dev/null \
+        | grep -q surface_serial_hub
+}
+
+bus_peuple() {
+    [ -n "$(ls -A /sys/bus/surface_aggregator/devices/ 2>/dev/null)" ]
+}
+
+attendre() {            # $1 = description, $2 = nom de fonction de test
+    i=0
+    while [ "$i" -lt 60 ]; do        # 60 x 50 ms = 3 s
+        if "$2"; then
+            [ "$i" -gt 0 ] && echo "[sp12-typecover] $1 : prêt après $((i * 50)) ms"
+            return 0
+        fi
+        sleep 0.05
+        i=$((i + 1))
+    done
+    echo "[sp12-typecover] $1 : délai de garde de 3 s dépassé, on poursuit" >&2
+}
+
+modprobe surface_aggregator
+attendre "contrôleur SAM" sam_pret
+
+modprobe surface_aggregator_registry
+attendre "bus surface_aggregator peuplé" bus_peuple
+
+modprobe surface_aggregator_hub
+modprobe surface_hid

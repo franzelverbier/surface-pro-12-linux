@@ -1,0 +1,10 @@
+[Unit]
+Description=SP12 - capture de l'etat 20 s apres le demarrage
+
+[Timer]
+OnBootSec=20s
+AccuracySec=1s
+Unit=sp12-bootreport.service
+
+[Install]
+WantedBy=timers.target

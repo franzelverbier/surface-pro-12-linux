@@ -1,0 +1,11 @@
+[Unit]
+Description=SP12 WiFi watchdog (recharge ath12k si wlan0 absent au boot)
+Wants=network.target
+After=systemd-udev-settle.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/sp12-wifi-watchdog
+
+[Install]
+WantedBy=multi-user.target

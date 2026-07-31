@@ -1,0 +1,11 @@
+[Unit]
+Description=SP12 - Charger les modules SAM (clavier/touchpad Type Cover)
+After=multi-user.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/sh -c "modprobe surface_aggregator && sleep 1 && modprobe surface_aggregator_registry && sleep 1 && modprobe surface_aggregator_hub && modprobe surface_hid"
+
+[Install]
+WantedBy=graphical.target multi-user.target

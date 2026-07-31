@@ -1,0 +1,14 @@
+[Unit]
+Description=SP12 - releve d'etat au demarrage
+# Apres la cible qui le veut : ne retarde pas le boot. Assez tard pour que
+# le wifi USB et le clavier aient eu le temps d'arriver.
+After=multi-user.target sp12-usbwifi.service sp12-typecover.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStartPre=/bin/sleep 20
+ExecStart=/usr/local/bin/sp12-bootreport
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,12 @@
+[Unit]
+Description=SP12 - charger la cle WiFi USB (RTL8192CU) apres le boot
+# Ordonne APRES la cible qui le veut : elle ne l'attend donc pas.
+After=multi-user.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/bin/sp12-usbwifi-load
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,14 @@
+[Unit]
+Description=SP12 - Activer le profil audio UCM (HiFi)
+After=sound.target
+Wants=sound.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStartPre=/bin/sh -c "for i in $(seq 1 30); do grep -q x1e80100 /proc/asound/cards 2>/dev/null && exit 0; sleep 1; done; exit 1"
+ExecStart=/usr/bin/alsaucm -c x1e80100 set _verb HiFi
+ExecStop=/usr/bin/alsaucm -c x1e80100 set _verb HiFi Inactive
+
+[Install]
+WantedBy=multi-user.target
