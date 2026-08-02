@@ -27,7 +27,12 @@
 #     Attention : arm-smmu.force_stage=1 ne teste PAS ce composant (c'est le
 #     paramètre du pilote SMMUv1/v2), il ne permet donc pas de l'écarter.
 #
-#  8. apss_watchdog : "reserved" -> "okay"
+#  8. reserved-memory/ramoops@a0000000 : zone de capture de plantage
+#     Sans elle, pstore reste vide et un plantage noyau ne laisse aucune trace.
+#     Deux redemarrages inexpliques (1er et 2 aout 2026) l'ont montre. 0xa0000000
+#     est dans System RAM sans reservation concurrente, verifie en EL2.
+#
+#  9. apss_watchdog : "reserved" -> "okay"
 #  9. sbsa_watchdog : status = "disabled"
 #     En EL2, c'est Linux qui possède le watchdog APSS ; le SBSA doit céder.
 #
@@ -39,7 +44,30 @@
  	};
  
  	clocks {
-@@ -2401,6 +2402,7 @@
+@@ -386,6 +387,22 @@
+ 		#size-cells = <0x02>;
+ 		ranges;
+ 
++		/*
++		 * Capture des plantages. Sans cette zone, pstore reste vide et un
++		 * plantage noyau ne laisse AUCUNE trace -- c'est ce qui a rendu deux
++		 * redemarrages inexpliquables les 1er et 2 aout 2026.
++		 * 0xa0000000 est dans System RAM (91480000-a7f00fff) sans reservation
++		 * concurrente, verifie sur machine vivante en EL2.
++		 * Relire apres un plantage : /sys/fs/pstore/
++		 */
++		ramoops@a0000000 {
++			compatible = "ramoops";
++			reg = <0x00 0xa0000000 0x00 0x100000>;
++			console-size = <0x40000>;
++			pmsg-size = <0x20000>;
++			ecc-size = <0x10>;
++		};
++
+ 		gunyah_hyp_mem: gunyah-hyp@80000000 {
+ 			reg = <0x00 0x80000000 0x00 0x800000>;
+ 			no-map;
+@@ -2401,6 +2418,7 @@
  		};
  
  		pcie6a: pci@1bf8000 {
@@ -47,7 +75,7 @@
  			device_type = "pci";
  			compatible = "qcom,pcie-x1e80100";
  			reg = <0x00 0x1bf8000 0x00 0x3000 0x00 0x70000000 0x00 0xf20 0x00 0x70000f40 0x00 0xa8 0x00 0x70001000 0x00 0x1000 0x00 0x70100000 0x00 0x100000 0x00 0x1bfb000 0x00 0x1000>;
-@@ -2524,6 +2526,7 @@
+@@ -2524,6 +2542,7 @@
  		};
  
  		pcie4: pci@1c08000 {
@@ -55,7 +83,7 @@
  			device_type = "pci";
  			compatible = "qcom,pcie-x1e80100";
  			reg = <0x00 0x1c08000 0x00 0x3000 0x00 0x7c000000 0x00 0xf1d 0x00 0x7c000f40 0x00 0xa8 0x00 0x7c001000 0x00 0x1000 0x00 0x7c100000 0x00 0x100000 0x00 0x1c0b000 0x00 0x1000>;
-@@ -2725,6 +2728,7 @@
+@@ -2725,6 +2744,7 @@
  			phandle = <0x188>;
  
  			gpu_zap_shader: zap-shader {
@@ -63,7 +91,7 @@
  				memory-region = <0xb7>;
  				firmware-name = "qcom/x1p42100/Microsoft/Surface12/qcdxkmsucpurwa.mbn";
  				phandle = <0x21e>;
-@@ -2903,6 +2907,7 @@
+@@ -2903,6 +2923,7 @@
  		};
  
  		remoteproc_adsp: remoteproc@6800000 {
@@ -71,7 +99,7 @@
  			compatible = "qcom,x1e80100-adsp-pas";
  			reg = <0x00 0x6800000 0x00 0x10000>;
  			interrupts-extended = <0x94 0x06 0x01 0xbb 0x00 0x01 0xbb 0x01 0x01 0xbb 0x02 0x01 0xbb 0x03 0x01>;
-@@ -3775,7 +3780,7 @@
+@@ -3775,7 +3796,7 @@
  			reset-names = "bus";
  			iommus = <0x33 0x1940 0x00 0x33 0x1947 0x00>;
  			dma-coherent;
@@ -80,7 +108,7 @@
  			firmware-name = "qcom/x1p42100/Microsoft/Surface12/qcvss8380_pa.mbn";
  			phandle = <0x231>;
  
-@@ -7121,7 +7126,7 @@
+@@ -7121,7 +7142,7 @@
  			interrupts = <0x00 0x8a 0x01 0x00 0x86 0x01 0x00 0x88 0x01>;
  			interrupt-names = "eventq", "gerror", "cmdq-sync";
  			dma-coherent;
@@ -89,7 +117,7 @@
  			phandle = <0x25b>;
  		};
  
-@@ -7152,7 +7157,7 @@
+@@ -7152,7 +7173,7 @@
  			reg = <0x00 0x17410000 0x00 0x1000>;
  			clocks = <0x29>;
  			interrupts = <0x00 0x00 0x01>;
@@ -98,7 +126,7 @@
  			phandle = <0x25c>;
  		};
  
-@@ -7701,6 +7706,7 @@
+@@ -7701,6 +7722,7 @@
  		};
  
  		sbsa_watchdog: watchdog@1c840000 {
@@ -106,7 +134,7 @@
  			compatible = "arm,sbsa-gwdt";
  			reg = <0x00 0x1c840000 0x00 0x1000 0x00 0x1c850000 0x00 0x1000>;
  			interrupts = <0x00 0x00 0x04>;
-@@ -7828,6 +7834,7 @@
+@@ -7828,6 +7850,7 @@
  		};
  
  		remoteproc_cdsp: remoteproc@32300000 {
