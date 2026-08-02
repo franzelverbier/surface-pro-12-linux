@@ -1,5 +1,8 @@
 # Différences device tree : EL1 -> EL2 (Surface Pro 12, x1p42100)
 #
+# Le DTB compile correspondant est publie ici : kernel/sp12-el2.dtb
+# (identique a celui reellement demarre sur la machine).
+#
 # Diff entre le DTS de fonctionnement normal (EL1) et celui utilisé pour démarrer
 # en EL2 avec KVM. Dix modifications, toutes nécessaires ; le reste du DTS est
 # identique. À appliquer sur votre propre DTS aplati (`dtc -I dtb -O dts`).
