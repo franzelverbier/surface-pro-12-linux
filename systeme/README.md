@@ -6,9 +6,9 @@ faire tourner cette machine.
 
 | Chemin | Rôle |
 |---|---|
-| `grub.cfg` | menu de référence, 9 entrées (EL1, secours, EL2/KVM, EL2 + audio) |
+| `grub.cfg` | menu de référence, 6 entrées (EL2+audio par défaut, repli EL2, EL1, Rescue, ramoops, Shell UEFI) |
 | `config-running-*.gz` | `.config` du noyau de référence |
-| `systemd/` | services SP12 et leurs drop-ins |
+| `systemd/` | services SP12 et leurs drop-ins, plus le correctif `onedriver@.service.d` |
 | `modprobe.d/` | listes noires de modules |
 | `modules-load.d/` | neutralisations de demandes de chargement |
 | `bin/` | scripts appelés par les unités |
@@ -70,6 +70,44 @@ Rien n'est perdu : `dmesg`, le journal et `sp12-bootreport` capturent toujours t
 écran réduit à 7 lignes rend au contraire une anomalie nouvelle immédiatement visible,
 alors qu'elle se noyait dans le bruit. Les entrées « verbeux / debug » et « Rescue »
 gardent `loglevel=7`.
+
+## `systemd/onedriver@.service.d/` — OneDrive qui redemande une connexion
+
+Symptôme : à chaque démarrage, `onedriver` réclame une réauthentification. On croit à un
+jeton expiré ; le jeton se porte très bien.
+
+**La cause est l'horloge.** Cette machine n'a pas d'horloge matérielle en EL2 : le pilote
+RTC (`rtc@6100`, pm8xxx) exige les variables EFI via `qcom,uefi-rtc-info`, or Secure Launch
+coupe l'accès à TrustZone qui les héberge — le pilote reste en `-EPROBE_DEFER`, `/dev/rtc`
+n'existe pas. L'heure est donc fausse jusqu'à ce que NTP la corrige, ce qui exige le
+réseau.
+
+Or OAuth est signé temporellement. Mesuré ici :
+
+| | |
+|---|---|
+| onedriver démarrait | 21,5 s |
+| NTP synchronisait | 33,9 s |
+
+Douze secondes à négocier avec Microsoft avec une horloge décalée. Le serveur rejette
+(`InvalidAuthenticationToken`), onedriver force une réauthentification, la fenêtre
+apparaît. Une fois l'heure juste, les renouvellements horaires passent tous.
+
+Le drop-in attend **deux** conditions — réseau connecté *et* `NTPSynchronized=yes` — avec
+un délai de garde de 120 s : au pire on démarre quand même, jamais on ne bloque la session.
+Après correction, onedriver démarre à 34,0 s, soit 0,3 s après l'heure juste. Zéro
+réauthentification, zéro redémarrage du service.
+
+⚠️ **`network-online.target` n'existe pas dans le gestionnaire utilisateur** — un `Wants=`
+dessus est sans effet. D'où le test explicite via `nmcli`.
+
+Il contient aussi `ExecStopPost=-/usr/bin/fusermount -uz %f`. Sans ça, un redémarrage après
+plantage échoue en silence : le point de montage FUSE reste en place, sale, et la nouvelle
+instance ne peut pas s'y greffer. Le processus tourne alors sans qu'aucun montage
+n'existe — ce qui ressemble, là encore, à une déconnexion de compte.
+
+Le drop-in est au niveau du **gabarit** (`onedriver@.service.d`), pas de l'instance : il
+s'applique quel que soit le point de montage. Rien à adapter pour le réutiliser ailleurs.
 
 ## `modules-load.d/cdrecord.conf`
 
