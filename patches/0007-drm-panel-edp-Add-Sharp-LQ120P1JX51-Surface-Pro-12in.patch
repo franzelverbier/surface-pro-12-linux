@@ -1,0 +1,77 @@
+From c0ea18f7e686e6a6e7c844c1ddd6b0a19fc6113f Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Fran=C3=A7ois=20Roux?= <info@humanlearning.ch>
+Date: Fri, 31 Jul 2026 13:44:50 +0200
+Subject: [PATCH v2] drm/panel-edp: Add Sharp LQ120P1JX51 (Surface Pro 12in 1st
+ Ed.)
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+The internal eDP panel of the Microsoft Surface Pro 12in 1st Edition
+(Snapdragon X Plus, X1P42100) is not in edp_panels[], so every boot
+produces the deliberate WARN_ON splat in panel_edp_probe() and the panel
+falls back to conservative timings:
+
+  WARNING: drivers/gpu/drm/panel/panel-edp.c:814 panel_edp_probe+0x53c/0x56c
+  panel-simple-dp-aux aux-aea0000.displayport-controller:
+      Unknown panel SHP 0x15a7, using conservative timings
+
+EDID, read over the panel's DP AUX DDC bus:
+
+  00 ff ff ff ff ff ff 00 4d 10 a7 15 a0 00 00 1f
+  31 22 01 04 a5 19 11 78 07 ee 91 a3 54 4c 99 26
+  0f 50 54 00 00 00 01 01 01 01 01 01 01 01 01 01
+  01 01 01 01 01 01 62 53 94 a0 80 b8 2e 50 18 10
+  3a 00 fe a9 00 00 00 18 13 7d 94 a0 80 b8 2e 50
+  18 10 3a 00 fe a9 00 00 00 18 00 00 00 fd 00 18
+  5a 88 88 21 01 00 00 00 00 00 00 00 00 00 00 fc
+  00 4c 51 31 32 30 50 31 4a 58 35 31 0a 20 00 69
+
+  Manufacturer: SHP
+  Model: 0x15a7
+  Made in: week 49 of 2024
+  Display Product Name: 'LQ120P1JX51'
+  DTD 1: 2196x1464 60.001799 Hz 3:2 (254 mm x 169 mm)
+  DTD 2: 2196x1464 90.002698 Hz 3:2 (254 mm x 169 mm)
+
+Timings are deliberately cautious rather than datasheet-derived. The
+conservative fallback sets unprepare=2000 and enable=200; unprepare=2000
+is a safety margin for unknown panels only and is the single occurrence
+of that value in the file -- no real panel entry uses it.
+delay_200_500_e200 keeps the same generous 200 ms enable delay while
+using the 500 ms unprepare shared by every actual panel in the table. A
+shorter enable delay may well be fine, but has not been validated here.
+
+Signed-off-by: François Roux <info@humanlearning.ch>
+---
+Changes in v2:
+- Read the EDID over the panel's DP AUX DDC bus and included it in the
+  commit message, as requested. My v1 claim that the EDID was not
+  obtainable was wrong: the connector does not export it
+  (/sys/class/drm/card0-eDP-1/edid is 0 bytes) and
+  CONFIG_DRM_DP_AUX_CHARDEV no longer exists, but the AUX bus is
+  registered as an i2c adapter, so a plain DDC read works:
+      i2ctransfer -y <bus> w1@0x50 0x00 r128
+  (i2cdump in byte mode does not: it drops a header byte and yields a
+  block with a bad checksum.)
+- The EDID carries a Display Product Name, so the entry is now
+  "LQ120P1JX51" instead of "Unknown".
+- Timings unchanged (delay_200_500_e200).
+- Now sent under my real name, as you asked. v1 went out as
+  "franzelverbier"; same person, same address.
+
+ drivers/gpu/drm/panel/panel-edp.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/gpu/drm/panel/panel-edp.c b/drivers/gpu/drm/panel/panel-edp.c
+index 13ce277d7..4defef820 100644
+--- a/drivers/gpu/drm/panel/panel-edp.c
++++ b/drivers/gpu/drm/panel/panel-edp.c
+@@ -2145,6 +2145,7 @@ static const struct edp_panel_entry edp_panels[] = {
+ 	EDP_PANEL_ENTRY('S', 'H', 'P', 0x154c, &delay_200_500_p2e100, "LQ116M1JW10"),
+ 	EDP_PANEL_ENTRY('S', 'H', 'P', 0x158f, &delay_200_500_p2e100, "LQ134Z1"),
+ 	EDP_PANEL_ENTRY('S', 'H', 'P', 0x1593, &delay_200_500_p2e100, "LQ134N1"),
++	EDP_PANEL_ENTRY('S', 'H', 'P', 0x15a7, &delay_200_500_e200, "LQ120P1JX51"),
+ 
+ 	EDP_PANEL_ENTRY('S', 'T', 'A', 0x0004, &delay_200_500_e200, "116KHD024006"),
+ 	EDP_PANEL_ENTRY('S', 'T', 'A', 0x0009, &delay_200_500_e250, "116QHD024002"),
