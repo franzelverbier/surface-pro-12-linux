@@ -6,12 +6,17 @@ d'origine ; voir le README racine pour la licence.
 | Patch | Objet | Origine |
 |---|---|---|
 | `0001` … `0006` | SAM, panneau eDP BOE, ASoC, qcom-scm, DTS SP12 | Harrison van der Byl |
-| `0007` | panneau eDP Sharp LQ120P1JX51 — v2 envoyée en amont, avec l'EDID | ce dépôt |
+| `0007` | panneau eDP Sharp LQ120P1JX51 — ✅ **accepté en amont**, `drm-misc-next` | ce dépôt |
 | `serie-complete/` | **les 16 patchs** séparant le noyau de référence de `next-20260626` — source correspondante complète | mixte, paternité préservée |
 | `audio-el2-serie.md` | notes sur la série remoteproc « attach » : mécanisme, pièges, avertissement ABI | Stephan Gerhold (miroir) |
 | `registry-next20260626.c` | table de registre SAM | Harrison van der Byl |
 
-## `0007` — le panneau eDP du Surface Pro 12
+## `0007` — le panneau eDP du Surface Pro 12 ✅ accepté en amont
+
+> **Ce patch est dans `drm-misc-next`** — commit `6ed8d820cea9cae226f500d3af86e156eede27f6`,
+> `Reviewed-by: Douglas Anderson <dianders@chromium.org>` (2026-08-03). Il descendra vers
+> mainline au prochain cycle de fusion. Le fichier est conservé ici pour qui compile avant
+> que le correctif ne soit disponible dans son arbre.
 
 `panel_edp_probe()` contient un `WARN_ON` **délibéré** quand le panneau n'est pas dans sa
 table : le commentaire au-dessus dit explicitement vouloir « que ce soit vraiment évident
