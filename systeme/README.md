@@ -114,3 +114,43 @@ s'applique quel que soit le point de montage. Rien à adapter pour le réutilise
 Surcharge vide masquant `/usr/lib/modules-load.d/cdrecord.conf`, qui réclame le module
 SCSI générique `sg`. `CONFIG_CHR_DEV_SG` n'est pas construit et la machine n'a pas de
 lecteur optique : la demande échouait à chaque démarrage.
+
+## Modules fantômes de la compilation perdue
+
+```
+reed_solomon: exports duplicate symbol decode_rs8 (owned by kernel)
+```
+
+Un module qui exporte un symbole **déjà détenu par le noyau** signale un `.ko` en trop :
+l'option est compilée en dur, et pourtant un module du même nom traîne dans
+`/lib/modules`. Ici `CONFIG_REED_SOLOMON=y` et `CONFIG_PSTORE_RAM=y`, mais
+`/lib/modules/…/kernel/lib/reed_solomon/reed_solomon.ko` et
+`kernel/fs/pstore/ramoops.ko` existaient encore, avec `modules.dep` déclarant le premier
+comme dépendance du second. Le chargement de `ramoops` au démarrage tirait
+`reed_solomon`, qui échouait — deux fois par démarrage.
+
+Leur origine est identifiable, et c'est la leçon à retenir :
+
+```bash
+strings /lib/modules/$(uname -r)/kernel/lib/reed_solomon/reed_solomon.ko | grep GCC:
+# GCC: (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0
+```
+
+Ils viennent de la **compilation WSL d'origine**, celle dont l'arbre `/root/linux-next` a
+disparu — exactement la même provenance que le module SAM qui avait faussé une analyse en
+juillet (voir `patches/README.md`). Notre arbre, lui, ne les construit pas : les options
+sont `=y`.
+
+`pstore` n'a jamais été affecté — il tourne depuis le code intégré :
+
+```
+[    0.019995] pstore: Registered ramoops as persistent store backend
+```
+
+Correctif appliqué : les deux `.ko` renommés en `*.etranger-inutilisable`, puis
+`sudo depmod -a`. `grep -c "reed_solomon\|ramoops" /lib/modules/$(uname -r)/modules.dep`
+doit alors renvoyer 0.
+
+⚠️ **Le réflexe général** : devant un module qui se comporte mal, vérifier d'abord d'où
+vient le binaire — `strings … | grep GCC:` — avant de raisonner sur les sources. Sur cette
+machine, une partie de `/lib/modules` provient d'un arbre qui n'existe plus.

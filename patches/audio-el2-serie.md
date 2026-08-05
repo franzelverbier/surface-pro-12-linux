@@ -75,10 +75,45 @@ de modules par image. Deux issues, pas trois :
 - ou ajouter `modprobe.blacklist=qcom_q6v5_pas` à **toutes** les autres entrées du menu
   de démarrage.
 
+## Le coût caché de la voie « attach » : 5 s d'attente au démarrage
+
+```
+qcom-apm gprsvc:service:2:1: CMD timeout for [1001021] opcode
+```
+
+`0x01001021` est `APM_CMD_GET_SPF_STATE` (`sound/soc/qcom/qdsp6/audioreach.h:40`), et le
+délai d'attente est de `5 * HZ` — **cinq secondes** — dans `audioreach.c:603`. La chaîne
+causale, mesurée :
+
+1. `q6apm` interroge l'ADSP vers 3,7 s
+2. aucune réponse → délai dépassé à 8,675 s
+3. `q6prm` avait renvoyé `-EPROBE_DEFER` (`q6prm.c:215`) ; il réessaie et **réussit**
+4. la carte son s'enregistre à 8,709 s
+5. tout service qui scrute `/proc/asound/cards` se débloque alors — ici
+   `sp12-audio-ucm.service`, 4,4 s d'attente, le service le plus lent du démarrage
+
+**Il n'y a qu'un seul message de délai dépassé.** La seconde interrogation obtient donc sa
+réponse : l'ADSP répond, simplement pas à 3,7 s. C'est une **course**, pas un refus.
+
+Hypothèse — non démontrée : en attachant l'ADSP au lieu de le démarrer, le pilote saute la
+poignée de main de démarrage qui précède normalement tout trafic GPR, et la première
+interrogation part avant que le service GPR de l'ADSP ne soit joignable. Impossible à
+vérifier par comparaison sur cette machine : l'entrée EL1 du menu blackliste
+`qcom_q6v5_pas`, donc pas d'audio, donc pas de démarrage témoin.
+
+**Ce que ça coûte réellement** : le chiffre de `systemd-analyze` (8,8 s) est presque
+entièrement cette attente, mais la chaîne critique atteint `graphical.target` à **2,95 s**
+— le bureau n'attend pas. Le gain d'un correctif serait l'audio disponible ~4 s plus tôt,
+pas un bureau plus rapide.
+
+Un correctif propre voudrait attendre la disponibilité du service GPR plutôt
+qu'interroger à l'aveugle. C'est du travail amont, pas un réglage.
+
 ## Vérifier
 
 ```bash
 cat /sys/class/remoteproc/remoteproc*/state         # attendu : attached
 cat /proc/asound/cards
 dmesg | grep -c "error -22 initializing firmware"   # attendu : 0
+dmesg | grep -c "CMD timeout for \[1001021\]"       # 1 = la course ci-dessus, sans gravite
 ```
