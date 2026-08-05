@@ -7,6 +7,7 @@ d'origine ; voir le README racine pour la licence.
 |---|---|---|
 | `0001` … `0006` | SAM, panneau eDP BOE, ASoC, qcom-scm, DTS SP12 | Harrison van der Byl |
 | `0007` | panneau eDP Sharp LQ120P1JX51 — ✅ **accepté en amont**, `drm-misc-next` | ce dépôt |
+| `0008` | RTC : décalage d'époque statique par device tree, pour EL2 où les variables EFI sont perdues | ce dépôt |
 | `serie-complete/` | **les 16 patchs** séparant le noyau de référence de `next-20260626` — source correspondante complète | mixte, paternité préservée |
 | `audio-el2-serie.md` | notes sur la série remoteproc « attach » : mécanisme, pièges, avertissement ABI | Stephan Gerhold (miroir) |
 | `registry-next20260626.c` | table de registre SAM | Harrison van der Byl |
@@ -53,6 +54,58 @@ assez lisible pour qu'on y lise le nom du modèle et qu'on s'y fie. Contrôler l
 500 ms commun à tous les panneaux de la table. C'est un choix prudent, **pas une valeur
 issue d'une fiche technique** : un `enable` plus court passerait probablement, mais ça n'a
 pas été validé ici. En cas d'artefact à la reprise de veille, remonter les délais.
+
+## `0008` — l'horloge matérielle en EL2
+
+En EL2, ce noyau n'a pas de `/dev/rtc0` : l'heure n'existe qu'une fois le NTP passé.
+La cause n'est pas le RTC, c'est la disparition des variables EFI.
+
+**Le mécanisme, mesuré et non supposé.** Après Secure Launch, TrustZone n'est pas mort —
+il répond encore à la requête de version (`TZ_OWNER_SIP` / `INFO_VERSION` renvoie
+`0x1402000`). Mais il refuse le gestionnaire de trustlets : `TZ_OWNER_QSEE_OS` /
+`APP_LOOKUP` échoue en `-22`. Donc `qcom_qseecom_uefisecapp` ne sonde jamais, `efivars`
+ne s'enregistre pas — **0 variable en EL2, contre 110 en EL1 avec le même noyau** — et
+`qcomtee` annonce `QTEE version 0.0.0` au lieu de `5.2.0`. Mainline ne sait pas recharger
+un trustlet : c'est une impasse constatée.
+
+Ce que cela fait au RTC : `pm8xxx_rtc_probe_offset()` lit son décalage d'époque dans la
+variable UEFI `RTCInfo`, et si `efivars` est absent il renvoie `-EPROBE_DEFER` **sans
+échappatoire** tant que `CONFIG_EFI=y`. Le pilote se reporte donc indéfiniment.
+
+Le correctif ajoute `qcom,rtc-offset` comme **troisième source**, testée après le nvmem
+et avant l'UEFI — l'ordre compte, la branche UEFI ne rendant jamais la main. Il est
+volontairement en lecture seule : sans nvmem ni UEFI, `pm8xxx_rtc_update_offset()`
+continue de renvoyer `-ENODEV`, donc un réglage d'heure ne peut pas écraser la valeur en
+silence puis la perdre à l'extinction.
+
+**Pourquoi pas la voie nvmem**, celle qu'utilisent `sc8280xp-crd`, `-arcata` et
+`-blackrock` avec une cellule `rtc_offset@bc` dans un SDAM du PMIC : elle n'est pas
+transposable ici. Sur le pmk8550 la fenêtre utilisable d'un SDAM est `0x40..0x7f`
+(`SDAM_MEM_START` vaut `0x40`, et le périphérique fait 128 octets) — **`0xbc` n'est même
+pas adressable**. Le SDAM 6 est par ailleurs densément écrit par le firmware. Des plages
+à zéro subsistent ailleurs, mais lire zéro ne prouve pas qu'un octet est libre, et cette
+machine est en double amorçage : écrire dans une mémoire persistante partagée sur la foi
+d'une inférence aurait pu se voir sous Windows.
+
+**Obtenir la valeur** : démarrer une fois en EL1, où la branche UEFI fonctionne, et lire
+le `dev_info` que le correctif ajoute au probe.
+
+```
+rtc-pm8xxx c42d000.spmi:pmic@0:rtc@6100: offset = 1749233527
+```
+
+⚠️ Le décalage vaut `(heure unix - compteur brut)` et reste constant **tant que le PMIC
+compte**. Si sa batterie se vide entièrement, le compteur repart et la valeur devient
+fausse **sans aucun message** : l'heure sera simplement décalée. Remède : refaire le
+relevé en EL1.
+
+⚠️ La valeur stockée par l'UEFI est elle-même approximative — 4,04 s de retard ici,
+mesurés au front de seconde du RTC contre une horloge NTP synchronisée. Ce n'est pas un
+défaut de la méthode : `update_offset()` ne réécrit qu'au-delà de 30 s de dérive, donc
+Windows tolère cet écart. Le DTS publié porte la valeur corrigée.
+
+Non proposé en amont : la propriété n'est pas documentée dans le binding, et le vrai
+problème est sans doute que la branche UEFI ne sait pas abandonner.
 
 ## `registry-next20260626.c` — le registre SAM
 

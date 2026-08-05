@@ -4,7 +4,7 @@
 # (identique a celui reellement demarre sur la machine).
 #
 # Diff entre le DTS de fonctionnement normal (EL1) et celui utilisé pour démarrer
-# en EL2 avec KVM. Dix modifications, toutes nécessaires ; le reste du DTS est
+# en EL2 avec KVM. Onze modifications, toutes nécessaires ; le reste du DTS est
 # identique. À appliquer sur votre propre DTS aplati (`dtc -I dtb -O dts`).
 #
 #  1. chosen/dtbhack-el2-overlay = "x1e-el2"
@@ -38,6 +38,41 @@
 #  9. apss_watchdog : "reserved" -> "okay"
 #  9. sbsa_watchdog : status = "disabled"
 #     En EL2, c'est Linux qui possède le watchdog APSS ; le SBSA doit céder.
+#
+# 11. pmk8550_rtc : qcom,rtc-offset -- l'horloge matérielle
+#     Nécessite le correctif hors-arbre patches/0008 (rtc: pm8xxx).
+#
+#     En EL2, les variables EFI sont perdues. Le mécanisme, mesuré et non
+#     supposé : après Secure Launch, TrustZone répond encore à la requête de
+#     version (TZ_OWNER_SIP / INFO_VERSION renvoie 0x1402000) mais refuse le
+#     gestionnaire de trustlets (TZ_OWNER_QSEE_OS / APP_LOOKUP échoue en -22).
+#     Donc qcom_qseecom_uefisecapp ne sonde jamais, efivars ne s'enregistre pas
+#     (0 variable, contre 110 en EL1 avec le même noyau), et qcomtee annonce
+#     « QTEE version 0.0.0 » au lieu de 5.2.0. Mainline ne sait pas recharger un
+#     trustlet : c'est une impasse constatée, pas une piste non explorée.
+#
+#     Conséquence pour le RTC : pm8xxx_rtc_probe_offset() lit son décalage
+#     d'époque dans la variable UEFI RTCInfo, et si efivars est absent il
+#     renvoie -EPROBE_DEFER **sans échappatoire** tant que CONFIG_EFI=y. Le RTC
+#     ne s'enregistre alors jamais — pas de /dev/rtc0, pas d'heure avant le NTP.
+#
+#     La propriété fournit une troisième source, testée après nvmem et avant
+#     UEFI. Le décalage vaut (heure unix - compteur brut) et reste constant tant
+#     que le PMIC compte.
+#
+#     La voie nvmem (celle qu'utilisent sc8280xp-crd, -arcata et -blackrock avec
+#     une cellule rtc_offset@bc) n'est PAS transposable ici : sur le pmk8550 la
+#     fenêtre utilisable d'un SDAM est 0x40..0x7f — 0xbc n'est pas adressable —
+#     et le SDAM 6 est densément écrit par le firmware. Sur une machine en
+#     double amorçage, écrire dans une mémoire persistante partagée sur la foi
+#     d'une inférence n'était pas acceptable.
+#
+#     Pour obtenir la valeur : démarrer une fois en EL1, où la branche UEFI
+#     fonctionne, et lire le dev_info ajouté par le correctif 0008.
+#
+#     ⚠️ Si la batterie du PMIC se vide entièrement, le compteur brut repart et
+#     la valeur devient fausse SANS AUCUN MESSAGE : l'heure sera simplement
+#     décalée. Remède : refaire le relevé en EL1.
 #
 @@ -9,6 +9,7 @@
  	chassis-type = "tablet";
@@ -110,6 +145,49 @@
 +			status = "disabled";
  			firmware-name = "qcom/x1p42100/Microsoft/Surface12/qcvss8380_pa.mbn";
  			phandle = <0x231>;
+ 
+@@ -4292,6 +4313,42 @@
+ 						interrupts = <0x00 0x62 0x01 0x01>;
+ 						qcom,no-alarm;
+ 						qcom,uefi-rtc-info;
++						/*
++						 * Decalage statique = 1749233531 (0x68432f7b).
++						 * Necessaire UNIQUEMENT en EL2 : apres Secure Launch,
++						 * TrustZone repond a la requete de version mais refuse
++						 * APP_LOOKUP (TZ_OWNER_QSEE_OS), donc uefisecapp ne sonde
++						 * jamais, efivars ne s'enregistre pas, et la branche UEFI
++						 * de pm8xxx_rtc_probe_offset() renvoie -EPROBE_DEFER
++						 * indefiniment : elle n'a aucune echappatoire tant que
++						 * CONFIG_EFI=y. Cette propriete est testee AVANT elle.
++						 * Necessite le correctif hors-arbre rtc-pm8xxx.
++						 *
++						 * Valeur relevee le 2026-08-05 sur un demarrage EL1, ou la
++						 * branche UEFI fonctionne (110 variables) :
++						 *   heure posee  1785954804
++						 *   moins offset 1749233527
++						 *   compteur brut  36721277 s = 425 j, coherent.
++						 *
++						 * Puis +4 s de correction. L'offset stocke par l'UEFI est
++						 * lui-meme en retard de 4,04 s sur l'heure reelle, mesure au
++						 * front de seconde du RTC contre une horloge NTP synchronisee.
++						 * Ce n'est pas un defaut de la methode : update_offset() ne
++						 * reecrit qu'au-dela de 30 s de derive, donc Windows tolere
++						 * cet ecart et nous l'avions fidelement recopie.
++						 *
++						 * Le decalage est constant tant que le PMIC compte. Si sa
++						 * batterie se vide entierement, le compteur repart et cette
++						 * valeur devient fausse SANS AUCUN MESSAGE : l'heure sera
++						 * simplement decalee. Remede : redemarrer en EL1 et relire
++						 * le dev_info du pilote.
++						 *
++						 * Uefi-rtc-info est conserve a dessein : en EL1 ce DTB n'est
++						 * pas utilise, et si un jour efivars revenait en EL2, il
++						 * suffirait de retirer la ligne ci-dessous pour repasser a
++						 * la source dynamique.
++						 */
++						qcom,rtc-offset = <0x68432f7b>;
+ 						phandle = <0x240>;
+ 					};
  
 @@ -7121,7 +7142,7 @@
  			interrupts = <0x00 0x8a 0x01 0x00 0x86 0x01 0x00 0x88 0x01>;

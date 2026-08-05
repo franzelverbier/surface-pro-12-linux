@@ -1,0 +1,84 @@
+From: =?UTF-8?q?Fran=C3=A7ois=20Roux?= <info@humanlearning.ch>
+Date: Wed, 5 Aug 2026 21:05:00 +0200
+Subject: [PATCH] rtc: pm8xxx: Add a static device-tree offset fallback
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+pm8xxx_rtc_probe_offset() has two sources for the epoch offset: an nvmem
+cell, then a UEFI variable behind "qcom,uefi-rtc-info". When the machine
+has no nvmem cell and efivars never register, the UEFI branch returns
+-EPROBE_DEFER unconditionally while CONFIG_EFI=y, with no give-up path,
+so the RTC never registers at all.
+
+That is the situation on a Surface Pro 12in (X1P42100) booted at EL2 via
+slbounce. After Secure Launch, TrustZone still answers a version query
+(TZ_OWNER_SIP / INFO_VERSION returns 0x1402000) but refuses the trustlet
+manager (TZ_OWNER_QSEE_OS / APP_LOOKUP fails with -22), so
+qcom_qseecom_uefisecapp never probes, efivars never register and there is
+no way to read RTCInfo. The same kernel at EL1 mounts efivarfs with 110
+variables and the RTC works.
+
+Add "qcom,rtc-offset" as a third source, tried after nvmem and before
+UEFI. The offset is (unix time - raw counter) and stays constant for as
+long as the PMIC keeps counting, so a fixed value remains valid until the
+PMIC loses power entirely.
+
+The static offset is deliberately read-only: with neither nvmem nor UEFI,
+pm8xxx_rtc_update_offset() still returns -ENODEV, so a set-time cannot
+silently overwrite it and then lose it at shutdown.
+
+Also print the resolved offset at probe, which is how the value is
+obtained in the first place: boot once at EL1, where the UEFI branch
+works, and read it from the log.
+
+Not sent upstream: the property is not documented in the binding, and the
+underlying problem is arguably that the UEFI branch cannot give up. This
+is published for people booting the same machine at EL2.
+
+Signed-off-by: François Roux <info@humanlearning.ch>
+---
+diff --git a/drivers/rtc/rtc-pm8xxx.c b/drivers/rtc/rtc-pm8xxx.c
+index e624f848c..8132524da 100644
+--- a/drivers/rtc/rtc-pm8xxx.c
++++ b/drivers/rtc/rtc-pm8xxx.c
+@@ -575,6 +575,28 @@ static int pm8xxx_rtc_probe_offset(struct pm8xxx_rtc *rtc_dd)
+ 		return pm8xxx_rtc_read_nvmem_offset(rtc_dd);
+ 	}
+ 
++	/*
++	 * Static offset from the device tree. Third source, tried after nvmem
++	 * and before UEFI.
++	 *
++	 * At EL2 after a Secure Launch, TrustZone answers a version query but
++	 * refuses APP_LOOKUP (TZ_OWNER_QSEE_OS), so uefisecapp never probes and
++	 * efivars never register. The UEFI branch below would then return
++	 * -EPROBE_DEFER forever: there is no give-up path while CONFIG_EFI=y.
++	 *
++	 * The offset is (unix time - raw counter). It stays constant for as
++	 * long as the PMIC keeps counting, so a fixed value holds until the
++	 * PMIC loses power entirely. Read it off an EL1 boot, where the UEFI
++	 * branch works, via the dev_info() in pm8xxx_rtc_probe().
++	 *
++	 * Deliberately read-only: with neither nvmem nor UEFI,
++	 * pm8xxx_rtc_update_offset() still returns -ENODEV, so a static offset
++	 * cannot be silently overwritten by a set-time and then lost.
++	 */
++	if (!of_property_read_u32(rtc_dd->dev->of_node, "qcom,rtc-offset",
++				  &rtc_dd->offset))
++		return 0;
++
+ 	/* Use UEFI storage as fallback if available */
+ 	rtc_dd->use_uefi = of_property_read_bool(rtc_dd->dev->of_node,
+ 						 "qcom,uefi-rtc-info");
+@@ -625,6 +647,10 @@ static int pm8xxx_rtc_probe(struct platform_device *pdev)
+ 		rc = pm8xxx_rtc_probe_offset(rtc_dd);
+ 		if (rc)
+ 			return rc;
++
++		/* Read this on an EL1 boot to learn the value for
++		 * qcom,rtc-offset; see pm8xxx_rtc_probe_offset(). */
++		dev_info(&pdev->dev, "offset = %u\n", rtc_dd->offset);
+ 	}
+ 
+ 	rc = pm8xxx_rtc_enable(rtc_dd);
