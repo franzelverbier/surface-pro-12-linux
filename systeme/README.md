@@ -154,3 +154,62 @@ doit alors renvoyer 0.
 ⚠️ **Le réflexe général** : devant un module qui se comporte mal, vérifier d'abord d'où
 vient le binaire — `strings … | grep GCC:` — avant de raisonner sur les sources. Sur cette
 machine, une partie de `/lib/modules` provient d'un arbre qui n'existe plus.
+
+## WiFi — les 15,6 s avant connexion, et pourquoi on n'y peut rien
+
+Au démarrage, le réseau n'est utilisable qu'à ~22 s alors que le bureau est là à 2,95 s.
+L'association elle-même prend 35 ms : tout le temps passe **avant**.
+
+### La cause, mesurée
+
+Journal NetworkManager en mode `DEBUG` (domaines `WIFI,WIFI_SCAN,DEVICE`) :
+
+```
++ 6,09 s   (wlan0): wifi-scan: start periodic scan (0 SSIDs to probe scan)
+           (wlan0): wifi-scan: scanning-state: scanning
++21,72 s   (wlan0): wifi-scan: scanning-state: idle
++21,72 s   policy: auto-activating connection
+```
+
+**Un seul balayage passif de 15,63 s**, et NM déclenche son auto-connexion à la
+milliseconde où il se termine. `0 SSIDs to probe` = pas de sondage actif : l'interface
+écoute les balises canal par canal. Le pilote démarre en domaine réglementaire `WORLD`, où
+l'émission est interdite sur la plupart des canaux, donc le balayage ne *peut pas* être
+actif. Avec la 6 GHz, cela fait une centaine de canaux à ~150 ms — le compte y est.
+
+Le domaine n'est appris (`CH`/`FR` selon la borne) que depuis les balises du point d'accès,
+c'est-à-dire **après** l'association. Trop tard pour le balayage qui la précède.
+
+⚠️ En journalisation `INFO` — le réglage par défaut — NM n'écrit **rien** pendant ces
+15 s et wpa_supplicant non plus. L'intervalle paraît vide, ce qui envoie chercher la cause
+partout sauf au bon endroit. Passer NM en `DEBUG` est le premier geste.
+
+### Quatre pistes essayées, toutes mortes
+
+| Tentative | Résultat |
+|---|---|
+| `802-11-wireless.band a` | S'applique bien (le `freq_list` passé à wpa_supplicant devient 5 GHz seul) mais contraint la **connexion**, pas le balayage périodique du **périphérique**. Aucun effet. |
+| `cfg80211.ieee80211_regdom=CH` en ligne de commande noyau | Le domaine global devient `CH`, et pourtant wpa_supplicant journalise toujours `CTRL-EVENT-REGDOM-CHANGE init=DRIVER type=WORLD`. **ath12k impose son propre domaine initial** depuis son firmware. Balayage inchangé à 15,62 s. Retiré. |
+| Paramètre de module ath12k | Le pilote n'expose que `debug_mask` et `ftm_mode`. Aucun réglage de bande ni de balayage. |
+| `freq_list` global de wpa_supplicant | Jamais lu : le service tourne en `-u -s -O` **sans `-c`**, donc piloté uniquement par D-Bus. |
+
+À noter aussi : `iw reg set` ne modifie pas les drapeaux des canaux du phy (30 passifs sur
+102, identiques en `WORLD` et en `FR`), et `/etc/conf.d/wireless-regdom` est **inerte** —
+aucun service ne le lit sur ce système, `wireless-regdom.service` n'existant pas.
+
+### Ce qui ne marcherait pas non plus
+
+Épingler `802-11-wireless.bssid` sur la borne. NM attend la **fin** du balayage avant même
+d'évaluer l'auto-connexion — `scanning-state: idle` puis `auto-activating` dans la même
+milliseconde. Le contenu du profil n'y change rien.
+
+### Où chercher, si quelqu'un veut reprendre
+
+Le verrou est que NM bloque son auto-connexion sur un balayage complet, et que le balayage
+est passif faute d'un domaine réglementaire connu à ce moment-là. Deux angles, tous deux
+en amont : faire qu'ath12k adopte le domaine réglementaire global au lieu du sien, ou
+qu'NM évalue l'auto-connexion sur des résultats partiels. Rien ne se règle par
+configuration.
+
+**Le symptôme n'est pas grave** : le bureau ne l'attend pas, seuls les services réseau
+arrivent tard. Documenté pour éviter de refaire les quatre tentatives ci-dessus.
