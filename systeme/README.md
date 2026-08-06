@@ -155,6 +155,48 @@ doit alors renvoyer 0.
 vient le binaire — `strings … | grep GCC:` — avant de raisonner sur les sources. Sur cette
 machine, une partie de `/lib/modules` provient d'un arbre qui n'existe plus.
 
+### Et le pire : `updates/`, que la configuration ne décrit pas
+
+Les deux modules ci-dessus étaient inoffensifs. Le répertoire `updates/` — qui **prime sur
+`kernel/`** dans l'ordre de recherche de `modprobe` — en contenait un qui, lui, portait une
+fonction réelle :
+
+```
+/lib/modules/7.1.0-next-20260626/updates/uhid.ko   ← GCC (Ubuntu 13.3.0)
+```
+
+Or `CONFIG_UHID` **n'est pas activé** dans le `.config` de ce noyau, ni dans aucune de nos
+configurations. La souris Bluetooth fonctionnait uniquement grâce à ce fichier posé à la
+main : `bluetoothd` crée les périphériques HID Bluetooth via `/dev/uhid`, et sans le module
+l'appairage réussit mais **aucune commande ne remonte** — symptôme déroutant, puisque tout
+paraît connecté.
+
+Le problème est resté invisible pendant des semaines et n'est apparu qu'à la première
+recompilation, un noyau fidèle à sa configuration ne pouvant pas produire ce module.
+
+Contenu complet du répertoire sur ce système, avec l'état de l'option correspondante :
+
+| Module | Option |
+|---|---|
+| `surface_aggregator`, `surface_hid`, `surface_hid_core`, `surface_aggregator_hub`, `surface_aggregator_registry`, `surface_aggregator_tabletsw` | `=m` — décrits par la config |
+| `uhid` | **`# CONFIG_UHID is not set`** — décrit nulle part |
+
+⚠️ **Avant toute recompilation**, inventorier `updates/` et vérifier que chaque module y
+figurant a bien une option activée :
+
+```bash
+find /lib/modules/$(uname -r)/updates -name '*.ko*' | while read f; do
+  m=$(basename "$f" | sed 's/\.ko.*//')
+  echo "$m : $(zcat /proc/config.gz | grep -E "^CONFIG_${m^^}=|^# CONFIG_${m^^} is not set")"
+done
+```
+
+Tout module dont l'option est absente ou à `not set` disparaîtra du noyau reconstruit.
+`surface_aggregator_registry` mérite une mention à part : la version d'`updates/` portait un
+groupe `sp12in` élagué à la main, là où l'arbre contient la version amont. Les deux
+fonctionnent ici — le détecteur de mode tablette existe simplement sous un autre nom,
+`POS Tablet Mode Switch` au lieu de `KIP` — mais l'écart n'était documenté nulle part.
+
 ## WiFi — les 15,6 s avant connexion, et pourquoi on n'y peut rien
 
 Au démarrage, le réseau n'est utilisable qu'à ~22 s alors que le bureau est là à 2,95 s.

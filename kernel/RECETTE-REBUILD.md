@@ -41,14 +41,38 @@
    partie de la série qui a produit ce noyau. `patches/serie-complete/` non plus — c'est
    la série EL2/remoteproc, à part.)
 3. `cp ../kernel/config-7.1.0-next-20260626 .config && make olddefconfig`
-4. `make -j$(nproc) Image modules dtbs`
+4. `make -j$(nproc) Image modules` — **sans `dtbs`**
+
+   Le portage n'utilise pas les DTB du noyau mais un DTB dérivé de celui du constructeur.
+   Et si `patches/serie-complete/0016` est appliqué, `dtbs` échoue sur une constante non
+   définie (`QCOM_SCM_VMID_SELF_OWNER`) — l'échec survient **avant** la production
+   d'`Image` et des modules, donc on ne récupère rien. Voir `serie-complete/README.md`.
 5. Installer : `Image` → `/boot/Image` ; `make modules_install` ; DTB → `/boot/sp12.dtb`
 
-## Netfilter — à intégrer au prochain `.config`
+## ⚠️ Avant toute recompilation : inventorier `updates/`
 
-Le noyau de référence n'a **aucune pile netfilter utilisable** : `iptables` échoue
-(`Failed to initialize nft: Protocol not supported`), `iptables-legacy` aussi
-(`Table does not exist`), et `ip rule` renvoie `Operation not supported`.
+`/lib/modules/<version>/updates/` prime sur `kernel/`, et peut contenir des modules posés à
+la main qu'**aucune option de configuration ne décrit**. Ils disparaissent du noyau
+reconstruit, en silence.
+
+Sur cette machine, `uhid.ko` s'y trouvait alors que `CONFIG_UHID` n'est activé nulle part :
+la souris Bluetooth s'appairait ensuite sans qu'aucune commande ne remonte. Voir
+`systeme/README.md` pour la commande d'inventaire et la liste complète.
+
+## Netfilter — ✅ résolu dans `7.1.0-next-20260626-nft`
+
+> **État au 2026-08-06.** Le noyau de référence `7.1.0-next-20260626` n'a **aucune pile
+> netfilter utilisable** : `iptables` échoue (`Failed to initialize nft: Protocol not
+> supported`), `iptables-legacy` aussi (`Table does not exist`), et `ip rule` renvoie
+> `Operation not supported`.
+>
+> Un noyau `-nft` a été reconstruit depuis le même arbre avec les options ci-dessous ;
+> `iptables v1.8.13 (nf_tables)` et `ip rule` y fonctionnent, et Tailscale y câble enfin
+> ses chaînes `ts-*` (4 règles, contre 0 sans policy routing). Les deux noyaux coexistent :
+> `CONFIG_LOCALVERSION="-nft"` leur donne des `/lib/modules` distincts, et une entrée GRUB
+> séparée pointe sur chacun.
+>
+> La section qui suit reste la référence pour reproduire ces options.
 
 ### Le symbole a changé de nom — le piège principal
 

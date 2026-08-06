@@ -41,3 +41,18 @@ souci d'intégralité mais **ne s'applique pas** sur linux-next tel quel : il r�
 `QCOM_SCM_VMID_SELF_OWNER`, constante absente de l'arbre, et son code consommateur
 (`shm-bridge-vmid`) n'existe pas non plus. Il dépend d'autres correctifs de la même
 série. Le sauter n'a aucune conséquence ici.
+
+⚠️ **Si vous l'appliquez quand même** — ce que fait notre propre arbre de travail, par
+inadvertance — la compilation du noyau échoue dès qu'on demande `dtbs` :
+
+```
+DTC     arch/arm64/boot/dts/qcom/x1-el2.dtbo
+Lexical error: arch/arm64/boot/dts/qcom/x1-el2.dtso:75.26-50
+               Unexpected 'QCOM_SCM_VMID_SELF_OWNER'
+FATAL ERROR: Syntax error parsing input tree
+```
+
+L'échec survient **avant** la production d'`Image` et des modules, donc un `make Image
+modules dtbs` ne laisse rien d'utilisable. Deux issues : retirer le patch, ou compiler
+`make Image modules` **sans** `dtbs` — le portage n'utilise pas les DTB du noyau, mais un
+DTB dérivé de celui du constructeur (voir `kernel/sp12-el2.dts.diff`).
