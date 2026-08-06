@@ -109,6 +109,31 @@ pas un bureau plus rapide.
 Un correctif propre voudrait attendre la disponibilité du service GPR plutôt
 qu'interroger à l'aveugle. C'est du travail amont, pas un réglage.
 
+### ✅ Contournement mesuré — `patches/0009`
+
+Puisque l'ADSP répond à la seconde tentative, il suffit de rater la première **vite**.
+`patches/0009` donne 1 seconde à cette seule requête, en laissant les `5 * HZ` à toutes les
+autres commandes — celles-là s'exécutent contre un ADSP qui a déjà répondu, et les tronquer
+pourrait interrompre une lecture en cours.
+
+```c
+unsigned long timeout = (hdr->opcode == APM_CMD_GET_SPF_STATE) ? HZ : 5 * HZ;
+```
+
+Mesuré sur la machine :
+
+| | avant | après |
+|---|---|---|
+| délai dépassé | 8,68 s | 5,70 s |
+| carte son enregistrée | 8,71 s | 5,74 s |
+| service en attente de la carte | 4,40 s | **0,37 s** |
+| démarrage total | 8,21 s | 6,74 s |
+
+Les 0,37 s du service sont la mesure la plus fiable : il ne fait qu'attendre la carte, donc
+son temps est celui du délai, sans dépendre du niveau de journalisation ni du reste du
+démarrage. La ligne d'erreur, elle, subsiste — la course est inchangée, seule son attente
+est raccourcie.
+
 ## Vérifier
 
 ```bash

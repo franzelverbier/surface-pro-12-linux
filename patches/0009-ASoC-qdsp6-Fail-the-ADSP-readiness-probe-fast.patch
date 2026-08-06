@@ -1,0 +1,85 @@
+From: =?UTF-8?q?Fran=C3=A7ois=20Roux?= <info@humanlearning.ch>
+Date: Thu, 6 Aug 2026 12:05:00 +0200
+Subject: [PATCH] ASoC: qdsp6: audioreach: Fail the ADSP readiness probe fast
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+audioreach_send_cmd_sync() waits 5 seconds for every command. That budget
+is right for graph commands, which run against an ADSP that has already
+answered and where a short timeout could truncate a legitimate slow
+response mid-playback.
+
+APM_CMD_GET_SPF_STATE is different. It is the readiness probe q6prm issues
+before populating its children, it is the only command sent while the ADSP
+may not be listening yet, and its caller already treats failure as
+-EPROBE_DEFER and retries:
+
+	q6prm_probe() -> if (!q6apm_is_adsp_ready()) return -EPROBE_DEFER;
+
+On a Surface Pro 12in (X1P42100) booted at EL2 via slbounce, the ADSP is
+*attached* rather than started -- it was brought up by the UEFI driver
+before ExitBootServices, so the kernel skips the boot handshake that
+normally precedes GPR traffic. The first readiness probe therefore always
+misses and the second always succeeds. Exactly one timeout per boot, and
+the full 5 seconds are spent waiting for a reply that will never come:
+
+	qcom-apm gprsvc:service:2:1: CMD timeout for [1001021] opcode
+
+The cost is not theoretical. The sound card only registers once the probe
+gives up, so any service polling /proc/asound/cards blocks for the whole
+timeout -- here it was the slowest unit of the entire boot.
+
+Give that one probe a 1 second budget and let the existing retry do the
+work. Measured on the machine above:
+
+	                          before      after
+	timeout logged at         8.68 s      5.70 s
+	sound card registered     8.71 s      5.74 s
+	card-waiting service      4.40 s      0.37 s
+	total boot                8.21 s      6.74 s
+
+Every other command keeps 5 * HZ.
+
+Not sent upstream: the underlying issue is arguably that the attach path
+should wait for the GPR service to come up rather than probing blind, and
+that is a larger change than shortening one timeout.
+
+Signed-off-by: François Roux <info@humanlearning.ch>
+---
+diff --git a/sound/soc/qcom/qdsp6/audioreach.c b/sound/soc/qcom/qdsp6/audioreach.c
+index e6e9eb2e8..742601bed 100644
+--- a/sound/soc/qcom/qdsp6/audioreach.c
++++ b/sound/soc/qcom/qdsp6/audioreach.c
+@@ -599,11 +599,29 @@ int audioreach_send_cmd_sync(struct device *dev, gpr_device_t *gdev,
+ 	if (rc < 0)
+ 		goto err;
+ 
++	/*
++	 * APM_CMD_GET_SPF_STATE is the readiness probe q6prm issues before
++	 * populating its children; it is the only command sent while the ADSP
++	 * may not be listening yet, and its caller already treats failure as
++	 * -EPROBE_DEFER and retries. On a Surface Pro 12 booted at EL2, where
++	 * the ADSP is attached rather than started (so the driver skips the
++	 * boot handshake that normally precedes GPR traffic), the first probe
++	 * always misses and the second always succeeds -- costing the full
++	 * timeout, once, on every boot. That delay is the single slowest item
++	 * in userspace startup: the sound card appears only when it expires.
++	 *
++	 * Fail this one probe fast and let the retry do the work. Every other
++	 * command keeps the 5 s budget, since those run against an ADSP that
++	 * has already answered and a short timeout could truncate a legitimate
++	 * slow response mid-playback.
++	 */
++	unsigned long timeout = (hdr->opcode == APM_CMD_GET_SPF_STATE) ? HZ : 5 * HZ;
++
+ 	if (rsp_opcode)
+ 		rc = wait_event_timeout(*cmd_wait, (result->opcode == hdr->opcode) ||
+-					(result->opcode == rsp_opcode),	5 * HZ);
++					(result->opcode == rsp_opcode),	timeout);
+ 	else
+-		rc = wait_event_timeout(*cmd_wait, (result->opcode == hdr->opcode), 5 * HZ);
++		rc = wait_event_timeout(*cmd_wait, (result->opcode == hdr->opcode), timeout);
+ 
+ 	if (!rc) {
+ 		dev_err(dev, "CMD timeout for [%x] opcode\n", hdr->opcode);

@@ -8,6 +8,7 @@ d'origine ; voir le README racine pour la licence.
 | `0001` … `0006` | SAM, panneau eDP BOE, ASoC, qcom-scm, DTS SP12 | Harrison van der Byl |
 | `0007` | panneau eDP Sharp LQ120P1JX51 — ✅ **accepté en amont**, `drm-misc-next` | ce dépôt |
 | `0008` | RTC : décalage d'époque statique par device tree, pour EL2 où les variables EFI sont perdues | ce dépôt |
+| `0009` | ASoC qdsp6 : échec rapide de la sonde de disponibilité de l'ADSP — 1,5 s de démarrage | ce dépôt |
 | `serie-complete/` | **les 16 patchs** séparant le noyau de référence de `next-20260626` — source correspondante complète | mixte, paternité préservée |
 | `audio-el2-serie.md` | notes sur la série remoteproc « attach » : mécanisme, pièges, avertissement ABI | Stephan Gerhold (miroir) |
 | `registry-next20260626.c` | table de registre SAM | Harrison van der Byl |
