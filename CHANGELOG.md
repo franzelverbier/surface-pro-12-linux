@@ -27,4 +27,12 @@ All dates 2026. Kernel reference build is **`7.1.0-next-20260626`** unless noted
 ## Upcoming
 
 - **The SP12 DTS is now upstream.** `x1p42100-microsoft-sp12.dts` is in linux-next, and the Makefile builds both it and `x1p42100-microsoft-sp12-el2.dtb` (with the `x1-el2.dtbo` overlay). Harrison van der Byl confirms all of his patches were merged, with a compatible rename from `microsoft,surface-pro-12in` to `microsoft,sp12` to avoid a clash with the 2026 model.
-- **Switching to the upstream DTS is not yet a drop-in.** A node-by-node comparison found the upstream EL2 DTB already carries three of our five deltas (PCIe SMMUv3 `okay`, zap-shader and iris disabled), but this unit would lose its touchscreen: it has an ELAN `04F3:4377` on GPIO 38/48, where upstream describes an ILIT2911/GTCH1563 on GPIO 51/52. Both descriptions are internally consistent, so it is a hardware variant, not a typo. Volume buttons, the USB-C SBU muxes and the panel-enable regulator are also absent upstream. Reported; awaiting guidance on how maintainers want variants discriminated.
+- **Switching to the upstream DTS.** A node-by-node comparison found the upstream EL2 DTB already carries three of our five deltas (PCIe SMMUv3 `okay`, zap-shader and iris disabled). Volume buttons, the USB-C SBU muxes and the panel-enable regulator are absent upstream and still need carrying over.
+
+  > **Correction (2026-08-06). The "touchscreen hardware variant" reported here did not exist, and the error was ours.** This entry previously claimed that upstream describes the touchscreen on GPIO 51/52 while this unit uses 38/48, concluded it was a board variant, and treated it as a blocker. All of that was wrong.
+  >
+  > `x1p42100-microsoft-sp12.dts` **does not exist in pristine `next-20260626`** — it was created in our tree by `patches/0005`, which is Harrison van der Byl's **v1**. The GPIO 51 in it is an early mistake of his, copied from similar devices, and fixed from v2 onward; [v4](https://lore.kernel.org/all/20260609145906.40854-2-harrison.vanderbyl@gmail.com/) is expected in 7.3 and describes 38/48 — this machine's actual wiring. So "upstream says 51" was us reading a patch we had applied ourselves and calling it upstream. A single `git log` on the file would have shown it.
+  >
+  > Two further claims were also wrong: booting with GPIO 51 leaves the touchscreen **degraded with missing pen events, not dead**; and "both descriptions are internally consistent, so it is not a typo" proved nothing — a mistake copied consistently into both the interrupt property and the pinctrl state is still a mistake.
+  >
+  > **There is no variant and no blocker.** Reported in error to the DT maintainers on 2026-08-04 and corrected on the thread.
