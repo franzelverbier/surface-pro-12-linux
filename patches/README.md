@@ -6,6 +6,7 @@ d'origine ; voir le README racine pour la licence.
 | Patch | Objet | Origine |
 |---|---|---|
 | `0001` … `0006` | SAM, panneau eDP BOE, ASoC, qcom-scm, DTS SP12 | Harrison van der Byl |
+| ⚠️ `0005` | **contient un GPIO tactile erroné** — voir la section dédiée en fin de document | Harrison van der Byl (v1) |
 | `0007` | panneau eDP Sharp LQ120P1JX51 — ✅ **accepté en amont**, `drm-misc-next` | ce dépôt |
 | `0008` | RTC : décalage d'époque statique par device tree, pour EL2 où les variables EFI sont perdues | ce dépôt |
 | `0009` | ASoC qdsp6 : échec rapide de la sonde de disponibilité de l'ADSP — 1,5 s de démarrage | ce dépôt |
@@ -191,6 +192,38 @@ travailler sur l'arbre amont et ses DTS, pas sur ces fichiers.
 Un changement compte particulièrement : le compatible est passé de
 `microsoft,surface-pro-12in` à **`microsoft,sp12`**, pour éviter le conflit avec le
 Surface Pro 12 modèle 2026.
+
+### ⚠️ `0005` porte un GPIO tactile erroné — et nous a fait publier un faux
+
+Ce patch est la **v1** de la série de Harrison. Il décrit l'interruption du digitizer sur
+`gpio51` et son reset sur `gpio52` :
+
+```dts
+interrupts-extended = <&tlmm 51 IRQ_TYPE_LEVEL_LOW>;
+int-n-pins   { pins = "gpio51"; };
+reset-n-pins { pins = "gpio52"; };
+```
+
+C'est **faux**. Harrison l'a corrigé dès sa v2 ; sa
+[v4](https://lore.kernel.org/all/20260609145906.40854-2-harrison.vanderbyl@gmail.com/),
+attendue en 7.3, décrit **38/48** — le câblage réel de la machine. Le 51 venait
+d'appareils voisins, recopié par erreur.
+
+Conséquence si vous appliquez `0005` tel quel : le tactile fonctionne mais **dégradé, sans
+événements stylet**. Pas mort, ce qui rend le symptôme d'autant plus facile à ne pas voir.
+
+**Le piège dans lequel nous sommes tombés**, et c'est le plus utile à retenir :
+`x1p42100-microsoft-sp12.dts` **n'existe pas** dans `next-20260626` vierge — c'est ce
+patch qui le crée. En le lisant dans notre arbre, nous avons cru lire l'amont, conclu à une
+variante matérielle, et signalé aux mainteneurs DT une divergence qui n'existait pas.
+Un `git log` sur le fichier l'aurait montré :
+
+```bash
+git log --oneline -- arch/arm64/boot/dts/qcom/x1p42100-microsoft-sp12.dts
+```
+
+Un seul commit, le nôtre. Sur un arbre où l'on a appliqué des patchs, **rien ne distingue
+visuellement un fichier amont d'un fichier qu'on a soi-même ajouté** : il faut le demander.
 
 Conséquence directe, et piège dans lequel je suis tombé : le registre SAM contient deux
 groupes, `ssam_node_group_sp12` (compatible `microsoft,sp12`, **le courant**) et
