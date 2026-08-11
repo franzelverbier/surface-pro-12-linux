@@ -57,6 +57,57 @@ r5_core->rproc->auto_boot = RPROC_AUTO_BOOT_ATTACH_OR_START;   /* ~1291 */
 
 Pilote Xilinx, non compilé sur cette plateforme.
 
+## ⚠️ Si un DSP plante, le noyau prend un oops et le DSP ne revient pas
+
+Constaté le 2026-08-11, sur une compilation de noyau de 28 minutes — le CDSP a lâché de
+lui-même, sans provocation :
+
+```
+qcom_q6v5_pas 32300000.remoteproc: fatal error received: sleep_statsi.c:537:
+remoteproc remoteproc1: crash detected in cdsp: type fatal error
+remoteproc remoteproc1: recovering cdsp
+remoteproc remoteproc1: stopped remote processor cdsp
+Unable to handle kernel NULL pointer dereference at virtual address 0000000000000000
+Internal error: Oops: 0000000086000004 [#1]  SMP
+pc : 0x0
+lr : rproc_start+0xc0/0x164
+Call trace:
+ rproc_trigger_recovery+0x148/0x164
+ rproc_crash_handler_work+0xb4/0xb8
+```
+
+**La chaîne, vérifiée pas à pas** — registre de lien, désassemblage du `vmlinux`
+correspondant au noyau en service, puis source :
+
+1. `rproc_trigger_recovery()` choisit sa branche ainsi :
+   ```c
+   if (rproc_has_feature(rproc, RPROC_FEAT_ATTACH_ON_RECOVERY))
+           ret = rproc_attach_recovery(rproc);
+   else
+           ret = rproc_boot_recovery(rproc);
+   ```
+2. `qcom_q6v5_pas.c` **ne déclare jamais** `RPROC_FEAT_ATTACH_ON_RECOVERY` — dans cet arbre,
+   seul `imx_rproc.c` le fait. La branche `boot` est donc prise.
+3. `rproc_boot_recovery()` appelle `rproc_start()`, qui fait, sans aucun test
+   (`remoteproc_core.c:1292`) :
+   ```c
+   ret = rproc->ops->start(rproc);
+   ```
+4. Or `qcom_pas_ops_no_reset` — celui que `qcom,broken-reset` sélectionne — ne fournit que
+   `.attach`, `.da_to_va`, `.stop` et `.panic`. **`.start` est nul.** Saut vers l'adresse 0.
+
+**Conséquences** : le worker de récupération meurt, le DSP reste `offline` jusqu'au
+redémarrage, et rien ne le relance. Ici l'ADSP n'était pas touché — l'audio a continué de
+fonctionner et la compilation s'est terminée normalement — mais un plantage de l'ADSP
+coûterait le son jusqu'au redémarrage.
+
+Piste de correctif, **non testée** : déclarer `RPROC_FEAT_ATTACH_ON_RECOVERY` quand ces ops
+sont choisies, pour que la récupération passe par `rproc_attach_recovery()`. Attention,
+cette voie appelle `__rproc_detach()` en premier et `.detach` manque aussi — mais elle, au
+moins, teste le pointeur avant de l'appeler et échoue proprement.
+
+Signalé à Stephan Gerhold.
+
 ## ⚠️ Rupture d'ABI des modules
 
 Le patch 7 change `bool auto_boot` en `enum rproc_auto_boot` dans `struct rproc`. Le champ

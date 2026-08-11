@@ -21,6 +21,12 @@
 #     le SMC PAS qui renvoie -22 en EL2 n'est jamais appelé. Indispensable pour
 #     l'audio, en complément de qebspil. Voir EL2-KVM.md.
 #
+#     ⚠️ Coût à connaître : si un DSP plante en fonctionnement, le noyau prend
+#     un oops (déréférencement nul dans rproc_start, ops->start étant absent de
+#     qcom_pas_ops_no_reset) et le DSP reste offline jusqu'au redémarrage.
+#     Constaté sur le CDSP le 2026-08-11. Détail complet et piste de correctif
+#     dans patches/audio-el2-serie.md.
+#
 #  6. iris (video-codec) : status = "disabled"
 #     Le décodeur vidéo ne survit pas à la bascule.
 #
