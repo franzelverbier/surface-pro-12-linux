@@ -85,9 +85,9 @@ silence puis la perdre à l'extinction.
 transposable ici. Sur le pmk8550 la fenêtre utilisable d'un SDAM est `0x40..0x7f`
 (`SDAM_MEM_START` vaut `0x40`, et le périphérique fait 128 octets) — **`0xbc` n'est même
 pas adressable**. Le SDAM 6 est par ailleurs densément écrit par le firmware. Des plages
-à zéro subsistent ailleurs, mais lire zéro ne prouve pas qu'un octet est libre, et cette
-machine est en double amorçage : écrire dans une mémoire persistante partagée sur la foi
-d'une inférence aurait pu se voir sous Windows.
+à zéro subsistent ailleurs, mais lire zéro ne prouve pas qu'un octet est libre : écrire
+dans une mémoire persistante que le firmware s'approprie, sur la foi d'une inférence,
+n'était pas acceptable.
 
 **Obtenir la valeur** : démarrer une fois en EL1, où la branche UEFI fonctionne, et lire
 le `dev_info` que le correctif ajoute au probe.

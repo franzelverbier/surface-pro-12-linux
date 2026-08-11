@@ -63,9 +63,9 @@
 #     La voie nvmem (celle qu'utilisent sc8280xp-crd, -arcata et -blackrock avec
 #     une cellule rtc_offset@bc) n'est PAS transposable ici : sur le pmk8550 la
 #     fenêtre utilisable d'un SDAM est 0x40..0x7f — 0xbc n'est pas adressable —
-#     et le SDAM 6 est densément écrit par le firmware. Sur une machine en
-#     double amorçage, écrire dans une mémoire persistante partagée sur la foi
-#     d'une inférence n'était pas acceptable.
+#     et le SDAM 6 est densément écrit par le firmware. Écrire dans une mémoire
+#     persistante que le firmware s'approprie, sur la foi d'une inférence,
+#     n'était pas acceptable.
 #
 #     Pour obtenir la valeur : démarrer une fois en EL1, où la branche UEFI
 #     fonctionne, et lire le dev_info ajouté par le correctif 0008.
