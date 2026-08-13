@@ -45,6 +45,16 @@ Not sent upstream: the underlying issue is arguably that the attach path
 should wait for the GPR service to come up rather than probing blind, and
 that is a larger change than shortening one timeout.
 
+Tool assistance, per Documentation/process/generated-content.rst: the
+diff, the commit message and the measurements quoted above were produced in a
+long interactive session with an AI coding assistant. The human signer directed
+the work, challenged the analysis repeatedly -- several intermediate conclusions
+were wrong and were retracted after measurement -- ran every test on the
+machine, and reviewed the result. No specialised analysis tool (coccinelle,
+sparse, smatch) was used; the verification was empirical, on the hardware
+described.
+
+Assisted-by: Claude:claude-opus-5
 Signed-off-by: François Roux <info@humanlearning.ch>
 ---
 diff --git a/sound/soc/qcom/qdsp6/audioreach.c b/sound/soc/qcom/qdsp6/audioreach.c

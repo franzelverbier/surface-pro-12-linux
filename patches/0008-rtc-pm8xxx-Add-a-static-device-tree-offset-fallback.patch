@@ -36,6 +36,16 @@ Not sent upstream: the property is not documented in the binding, and the
 underlying problem is arguably that the UEFI branch cannot give up. This
 is published for people booting the same machine at EL2.
 
+Tool assistance, per Documentation/process/generated-content.rst: the
+diff, the commit message and the measurements quoted above were produced in a
+long interactive session with an AI coding assistant. The human signer directed
+the work, challenged the analysis repeatedly -- several intermediate conclusions
+were wrong and were retracted after measurement -- ran every test on the
+machine, and reviewed the result. No specialised analysis tool (coccinelle,
+sparse, smatch) was used; the verification was empirical, on the hardware
+described.
+
+Assisted-by: Claude:claude-opus-5
 Signed-off-by: François Roux <info@humanlearning.ch>
 ---
 diff --git a/drivers/rtc/rtc-pm8xxx.c b/drivers/rtc/rtc-pm8xxx.c
