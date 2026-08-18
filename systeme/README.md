@@ -255,3 +255,66 @@ configuration.
 
 **Le symptôme n'est pas grave** : le bureau ne l'attend pas, seuls les services réseau
 arrivent tard. Documenté pour éviter de refaire les quatre tentatives ci-dessus.
+
+## WiFi — déconnexions périodiques `reason=34`, et pourquoi ce n'était pas le réseau
+
+Symptôme : la liaison tombait puis se rétablissait toutes les quarante minutes environ.
+Mesuré sur un démarrage de référence : **8 coupures en 5 h 41**, soit 1,41 par heure.
+
+### Lire le motif plutôt que supposer
+
+Le journal de `wpa_supplicant` donne la réponse directement :
+
+```bash
+journalctl -b -u wpa_supplicant | grep -o "CTRL-EVENT-DISCONNECTED.*reason=[0-9]*"
+```
+
+Les huit coupures portaient **toutes** `reason=34` — `DISASSOC_LOW_ACK` dans la norme
+IEEE 802.11 : *le point d'accès éjecte la station parce qu'il ne reçoit plus ses accusés de
+réception*. C'est donc la borne qui coupe, mais pas parce que le réseau va mal.
+
+Le signal était à **−46 dBm**, c'est-à-dire excellent. Une station à portée idéale qui cesse
+d'acquitter, c'est une radio qui s'endort — pas une liaison qui faiblit.
+
+### Deux suspects écartés avant de conclure
+
+- **`sp12-wifi-watchdog`** : c'est un `Type=oneshot` lié à `multi-user.target`, donc il
+  s'exécute une fois au démarrage et rien de plus. `systemctl is-active` le donne
+  `inactive` en session, et il avait déclenché **0 fois** sur le démarrage étudié.
+- **NetworkManager** : il *subit*. Le journal montre `supplicant interface state:
+  disconnected -> scanning` **après** l'éjection, jamais avant. Il n'initie rien.
+
+### Le correctif
+
+Désactiver l'économie d'énergie WiFi, pour cette connexion seulement :
+
+```bash
+sudo nmcli connection modify "<connexion>" 802-11-wireless.powersave 2
+sudo nmcli connection up "<connexion>"
+```
+
+Les valeurs sont `0` défaut, `1` ignorer, `2` désactiver, `3` activer. Le réglage est
+persistant et survit aux redémarrages — vérifié sur deux reboots.
+
+### Résultat, mesuré
+
+| | |
+|---|---|
+| Avant | 1,41 coupure par heure |
+| Attendu sur 93 h à ce rythme | **131** |
+| Observé sur 93 h | **0** `reason=34` |
+| Signal pendant l'observation | descendu à −63 dBm, sans effet |
+
+Les seules déconnexions restantes sont des `reason=3` — la station qui part d'elle-même,
+c'est-à-dire les extinctions avant redémarrage. Le résultat est d'autant plus net que le
+signal était **plus faible** pendant l'observation qu'au moment du diagnostic.
+
+⚠️ **Le coût énergétique n'a pas pu être mesuré, et il ne faut pas prétendre le contraire.**
+L'ordre de grandeur attendu pour une puce moderne est de 0,1 à 0,3 W. Sur cette machine les
+relevés de consommation s'échelonnaient sur ±1 W à cause d'un processus occupant un cœur
+entier, soit cinq à dix fois le signal cherché. À comparer aux 0,9 W mesurés du passage
+90 → 60 Hz, qui reste le levier dominant. Une coupure toutes les quarante minutes coûte de
+toute façon plus cher en usage qu'un dixième de watt.
+
+Script de contrôle : `verifier-wifi-stabilite.sh` (hors dépôt) classe les coupures par
+motif et refuse de conclure avant deux heures d'observation.
