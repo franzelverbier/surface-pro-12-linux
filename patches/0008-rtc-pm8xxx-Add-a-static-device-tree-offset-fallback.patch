@@ -20,9 +20,15 @@ no way to read RTCInfo. The same kernel at EL1 mounts efivarfs with 110
 variables and the RTC works.
 
 Add "qcom,rtc-offset" as a third source, tried after nvmem and before
-UEFI. The offset is (unix time - raw counter) and stays constant for as
-long as the PMIC keeps counting, so a fixed value remains valid until the
-PMIC loses power entirely.
+UEFI. The offset is (unix time - raw counter), read off an EL1 boot where the
+UEFI branch works.
+
+It is NOT stable over time, and the first version of this patch claimed
+otherwise. Measured here: 20 ms of error right after setting it, 3615 s two
+weeks later -- about 250 s/day, so the PMIC counter runs roughly 0.29 % slow
+against real time. A fixed value is good for hours, not weeks. It is only
+useful where something else corrects the clock shortly after boot; on this
+machine NTP does, within a minute.
 
 The static offset is deliberately read-only: with neither nvmem nor UEFI,
 pm8xxx_rtc_update_offset() still returns -ENODEV, so a set-time cannot
@@ -49,10 +55,10 @@ Assisted-by: Claude:claude-opus-5
 Signed-off-by: François Roux <info@humanlearning.ch>
 ---
 diff --git a/drivers/rtc/rtc-pm8xxx.c b/drivers/rtc/rtc-pm8xxx.c
-index e624f848c..8132524da 100644
+index e624f848c..4d13e3ff1 100644
 --- a/drivers/rtc/rtc-pm8xxx.c
 +++ b/drivers/rtc/rtc-pm8xxx.c
-@@ -575,6 +575,28 @@ static int pm8xxx_rtc_probe_offset(struct pm8xxx_rtc *rtc_dd)
+@@ -575,6 +575,35 @@ static int pm8xxx_rtc_probe_offset(struct pm8xxx_rtc *rtc_dd)
  		return pm8xxx_rtc_read_nvmem_offset(rtc_dd);
  	}
  
@@ -65,10 +71,17 @@ index e624f848c..8132524da 100644
 +	 * efivars never register. The UEFI branch below would then return
 +	 * -EPROBE_DEFER forever: there is no give-up path while CONFIG_EFI=y.
 +	 *
-+	 * The offset is (unix time - raw counter). It stays constant for as
-+	 * long as the PMIC keeps counting, so a fixed value holds until the
-+	 * PMIC loses power entirely. Read it off an EL1 boot, where the UEFI
-+	 * branch works, via the dev_info() in pm8xxx_rtc_probe().
++	 * The offset is (unix time - raw counter). Read it off an EL1 boot,
++	 * where the UEFI branch works, via the dev_info() in pm8xxx_rtc_probe().
++	 *
++	 * It is NOT stable over time. Measured on a Surface Pro 12in: 20 ms of
++	 * error right after setting it, 3615 s two weeks later -- roughly
++	 * 250 s/day, i.e. the PMIC counter runs about 0.29 % slow against real
++	 * time. A fixed value is therefore good for hours, not weeks, and this
++	 * is only useful where something else fixes the clock shortly after
++	 * boot. Here NTP does, within a minute; anything reading the clock
++	 * before that sees an error that grows by ~4 minutes a day since the
++	 * offset was last computed.
 +	 *
 +	 * Deliberately read-only: with neither nvmem nor UEFI,
 +	 * pm8xxx_rtc_update_offset() still returns -ENODEV, so a static offset
@@ -81,7 +94,7 @@ index e624f848c..8132524da 100644
  	/* Use UEFI storage as fallback if available */
  	rtc_dd->use_uefi = of_property_read_bool(rtc_dd->dev->of_node,
  						 "qcom,uefi-rtc-info");
-@@ -625,6 +647,10 @@ static int pm8xxx_rtc_probe(struct platform_device *pdev)
+@@ -625,6 +654,10 @@ static int pm8xxx_rtc_probe(struct platform_device *pdev)
  		rc = pm8xxx_rtc_probe_offset(rtc_dd);
  		if (rc)
  			return rc;

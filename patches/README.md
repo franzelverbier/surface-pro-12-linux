@@ -130,10 +130,28 @@ le `dev_info` que le correctif ajoute au probe.
 rtc-pm8xxx c42d000.spmi:pmic@0:rtc@6100: offset = 1749233527
 ```
 
-⚠️ Le décalage vaut `(heure unix - compteur brut)` et reste constant **tant que le PMIC
-compte**. Si sa batterie se vide entièrement, le compteur repart et la valeur devient
-fausse **sans aucun message** : l'heure sera simplement décalée. Remède : refaire le
-relevé en EL1.
+⚠️ **Ce décalage dérive, et cette note affirmait d'abord le contraire.** Mesuré au front de
+seconde contre une horloge NTP synchronisée :
+
+| Date | Erreur du RTC |
+|---|---|
+| 5 août, juste après réglage | **20 ms** |
+| 20 août | **3615 s** — 1 h 0 min 15 s |
+
+Environ **250 s par jour** : le compteur du PMIC tourne à peu près **0,29 % trop lentement**
+que le temps réel. Ce n'est pas de la dérive de quartz ordinaire, c'est un ordre de grandeur
+au-dessus. Une valeur figée vaut donc pour des heures, pas pour des semaines.
+
+L'approche reste utilisable **parce qu'autre chose corrige l'heure peu après le démarrage** :
+ici le NTP, en moins d'une minute, et le correctif `onedriver` attend explicitement
+`NTPSynchronized`. Mais tout ce qui lit l'heure pendant cette minute voit une valeur fausse,
+d'autant plus fausse qu'on s'éloigne du dernier relevé.
+
+⚠️ Si la batterie du PMIC se vide entièrement, le compteur brut repart : même symptôme en
+pire, toujours **sans aucun message**.
+
+Remède dans les deux cas : redémarrer en EL1 et relire le `dev_info` du pilote pour
+recalculer la valeur.
 
 ⚠️ La valeur stockée par l'UEFI est elle-même approximative — 4,04 s de retard ici,
 mesurés au front de seconde du RTC contre une horloge NTP synchronisée. Ce n'est pas un

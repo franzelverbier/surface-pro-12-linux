@@ -101,12 +101,49 @@ redémarrage, et rien ne le relance. Ici l'ADSP n'était pas touché — l'audio
 fonctionner et la compilation s'est terminée normalement — mais un plantage de l'ADSP
 coûterait le son jusqu'au redémarrage.
 
-Piste de correctif, **non testée** : déclarer `RPROC_FEAT_ATTACH_ON_RECOVERY` quand ces ops
-sont choisies, pour que la récupération passe par `rproc_attach_recovery()`. Attention,
-cette voie appelle `__rproc_detach()` en premier et `.detach` manque aussi — mais elle, au
-moins, teste le pointeur avant de l'appeler et échoue proprement.
+### ✅ Le correctif, vérifié sur la machine
 
-Signalé à Stephan Gerhold.
+J'avais d'abord proposé `RPROC_FEAT_ATTACH_ON_RECOVERY`, pour que la récupération passe par
+`rproc_attach_recovery()`. **Stephan Gerhold a répondu que c'était le mauvais raisonnement** :
+on ne sait pas relancer ce DSP, et rattacher un processeur planté n'a aucun sens. Sa
+proposition — `rproc->recovery_disabled = true`.
+
+J'avais aussi écrit que le plantage n'était pas déclenchable à la demande. **Faux** :
+`debugfs` l'expose. Deux essais sur le même démarrage, même déclencheur, une seule variable :
+
+```bash
+echo disabled > /sys/kernel/debug/remoteproc/remoteproc1/recovery
+echo 2        > /sys/kernel/debug/remoteproc/remoteproc1/crash
+```
+
+```
+remoteproc remoteproc1: crash detected in cdsp: type fatal error
+remoteproc remoteproc1: handling crash #1 in cdsp
+```
+
+Rien d'autre. Aucune tentative de récupération, **aucun oops**, noyau non tainté, et l'état
+passe à `crashed` plutôt qu'`offline` — plus honnête, puisque rien n'a arrêté le DSP.
+
+Le témoin, en réactivant la récupération sur ce même DSP planté :
+
+```
+remoteproc remoteproc1: recovering cdsp
+remoteproc remoteproc1: stopped remote processor cdsp
+Unable to handle kernel NULL pointer dereference at virtual address 0
+pc : 0x0
+lr : rproc_start+0xc0/0x164
+```
+
+Signature identique au plantage spontané, seul le point d'entrée diffère. **`recovery_disabled`
+règle le problème**, c'est vérifié.
+
+⚠️ Reste que `rproc_start()` appelle `ops->start` sans le tester, et `rproc_boot_recovery()`
+fait de même pour `ops->coredump`. Même avec le drapeau correctement posé par tous les
+pilotes, un `rproc_ops` sans `.start` reste à une écriture debugfs d'un appel nul.
+
+Stephan précise par ailleurs que **toute l'approche `qcom,broken-reset` est discutée** et
+qu'il n'est pas certain de la proposer un jour en amont en l'état. À savoir avant de bâtir
+dessus.
 
 ## ⚠️ Rupture d'ABI des modules
 

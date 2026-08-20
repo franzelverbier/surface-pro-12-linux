@@ -63,8 +63,7 @@
 #     ne s'enregistre alors jamais — pas de /dev/rtc0, pas d'heure avant le NTP.
 #
 #     La propriété fournit une troisième source, testée après nvmem et avant
-#     UEFI. Le décalage vaut (heure unix - compteur brut) et reste constant tant
-#     que le PMIC compte.
+#     UEFI. Le décalage vaut (heure unix - compteur brut).
 #
 #     La voie nvmem (celle qu'utilisent sc8280xp-crd, -arcata et -blackrock avec
 #     une cellule rtc_offset@bc) n'est PAS transposable ici : sur le pmk8550 la
@@ -76,9 +75,26 @@
 #     Pour obtenir la valeur : démarrer une fois en EL1, où la branche UEFI
 #     fonctionne, et lire le dev_info ajouté par le correctif 0008.
 #
-#     ⚠️ Si la batterie du PMIC se vide entièrement, le compteur brut repart et
-#     la valeur devient fausse SANS AUCUN MESSAGE : l'heure sera simplement
-#     décalée. Remède : refaire le relevé en EL1.
+#     ⚠️ CETTE VALEUR DÉRIVE, et cette note affirmait d'abord le contraire.
+#     Mesures au front de seconde contre une horloge NTP synchronisée :
+#
+#         5 août, juste après réglage      20 ms d'erreur
+#         20 août                        3615 s d'erreur
+#
+#     Soit environ 250 s par jour : le compteur du PMIC tourne à peu près
+#     0,29 % trop lentement. Une valeur figée vaut pour des heures, pas pour
+#     des semaines, et l'erreur croît de ~4 min par jour depuis le relevé.
+#
+#     Cela reste utilisable ici parce que le NTP corrige en moins d'une minute
+#     et que le correctif onedriver attend explicitement NTPSynchronized. Mais
+#     tout ce qui lit l'heure avant cela voit une valeur fausse, et l'écart
+#     grandit tant qu'on ne refait pas le relevé.
+#
+#     ⚠️ Si la batterie du PMIC se vide entièrement, le compteur brut repart :
+#     même symptôme en pire, toujours SANS AUCUN MESSAGE.
+#
+#     Remède dans les deux cas : redémarrer en EL1 et relire le dev_info du
+#     pilote pour recalculer la valeur.
 #
 @@ -9,6 +9,7 @@
  	chassis-type = "tablet";
@@ -152,7 +168,7 @@
  			firmware-name = "qcom/x1p42100/Microsoft/Surface12/qcvss8380_pa.mbn";
  			phandle = <0x231>;
  
-@@ -4292,6 +4313,42 @@
+@@ -4292,6 +4313,54 @@
  						interrupts = <0x00 0x62 0x01 0x01>;
  						qcom,no-alarm;
  						qcom,uefi-rtc-info;
@@ -177,14 +193,26 @@
 +						 * lui-meme en retard de 4,04 s sur l'heure reelle, mesure au
 +						 * front de seconde du RTC contre une horloge NTP synchronisee.
 +						 * Ce n'est pas un defaut de la methode : update_offset() ne
-+						 * reecrit qu'au-dela de 30 s de derive, donc Windows tolere
-+						 * cet ecart et nous l'avions fidelement recopie.
++						 * reecrit qu'au-dela de 30 s de derive, donc le firmware
++						 * tolere cet ecart et nous l'avions fidelement recopie.
 +						 *
-+						 * Le decalage est constant tant que le PMIC compte. Si sa
-+						 * batterie se vide entierement, le compteur repart et cette
-+						 * valeur devient fausse SANS AUCUN MESSAGE : l'heure sera
-+						 * simplement decalee. Remede : redemarrer en EL1 et relire
-+						 * le dev_info du pilote.
++						 * ATTENTION -- ce decalage N'EST PAS STABLE dans le temps,
++						 * contrairement a ce que cette note affirmait d'abord.
++						 * Mesures au front de seconde contre une horloge NTP :
++						 *   5 aout, juste apres reglage   20 ms d'erreur
++						 *   20 aout                       3615 s d'erreur
++						 * Soit ~250 s par jour : le compteur du PMIC tourne environ
++						 * 0,29 % trop lentement. Une valeur figee vaut pour des
++						 * heures, pas pour des semaines, et l'erreur croit de ~4 min
++						 * par jour depuis le dernier relevé.
++						 *
++						 * Cela reste utile ici parce que le NTP corrige en moins
++						 * d'une minute, et que le correctif onedriver attend
++						 * explicitement NTPSynchronized. Mais tout ce qui lit
++						 * l'heure avant cela voit une valeur fausse.
++						 *
++						 * Remede quand l'ecart gene : redemarrer en EL1 et relire le
++						 * dev_info du pilote pour recalculer la valeur.
 +						 *
 +						 * Uefi-rtc-info est conserve a dessein : en EL1 ce DTB n'est
 +						 * pas utilise, et si un jour efivars revenait en EL2, il
