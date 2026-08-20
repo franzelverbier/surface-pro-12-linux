@@ -6,7 +6,7 @@ faire tourner cette machine.
 
 | Chemin | Rôle |
 |---|---|
-| `grub.cfg` | menu de référence, 6 entrées (EL2+audio par défaut, repli EL2, EL1, Rescue, ramoops, Shell UEFI) |
+| `grub.cfg` | menu de référence, 5 entrées (EL2+audio+nftables par défaut, secours figé daté, EL2 du 31 juillet, EL1, Shell UEFI) |
 | `config-running-*.gz` | `.config` du noyau de référence |
 | `systemd/` | services SP12 et leurs drop-ins, plus le correctif `onedriver@.service.d` |
 | `modprobe.d/` | listes noires de modules |
@@ -68,8 +68,8 @@ identifiés un par un et sont bénins :
 
 Rien n'est perdu : `dmesg`, le journal et `sp12-bootreport` capturent toujours tout. Un
 écran réduit à 7 lignes rend au contraire une anomalie nouvelle immédiatement visible,
-alors qu'elle se noyait dans le bruit. Les entrées « verbeux / debug » et « Rescue »
-gardent `loglevel=7`.
+alors qu'elle se noyait dans le bruit. L'entrée de secours figée garde `loglevel=7` :
+si on y recourt, c'est que quelque chose ne va pas, autant tout voir.
 
 ## `systemd/onedriver@.service.d/` — OneDrive qui redemande une connexion
 
