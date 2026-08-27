@@ -1,0 +1,22 @@
+[Unit]
+Description=Témoin SP12 — relevé fsync'é pour les coupures sans trace
+Documentation=file:///data/sp12data/temoin/LISEZ-MOI.md
+After=local-fs.target
+Wants=local-fs.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/sp12-temoin.js
+Restart=always
+RestartSec=5
+# Laisse au script le temps d'écrire son marqueur d'arrêt, sans plus.
+KillSignal=SIGTERM
+TimeoutStopSec=10
+Nice=10
+IOSchedulingClass=idle
+# Le journal reçoit déjà tout ; on n'y duplique pas les relevés.
+StandardOutput=null
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

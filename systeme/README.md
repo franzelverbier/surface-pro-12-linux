@@ -43,6 +43,23 @@ démarrage, d'où le chargement tardif avec réessai.
 d'attente entrent dans la transaction de démarrage et gonflent le temps rapporté par
 `systemd-analyze` sans rien retarder de réel.
 
+**`sp12-temoin.service`** — relevé périodique `fsync`'é, dans
+`/data/sp12data/temoin/temoin.jsonl`. Ajouté le 2026-08-27 après deux redémarrages
+spontanés sans aucune trace (26 août 20:43:54, 27 août 08:38:34).
+
+Il existe parce que **ramoops ne retient rien sur cette machine** (voir plus bas). Il ne
+remplace pas un vidage noyau et **ne dira jamais pourquoi** la machine est tombée. Il
+établit deux choses : l'état juste avant — température maximale, énergie et tension
+batterie, alimentation, fréquences CPU, charge, mémoire — échantillonné toutes les 30 s ;
+et surtout **la nature de l'arrêt**. Le script écrit une ligne `"type":"stop"` sur SIGTERM :
+sa présence en fin de boot signe une extinction volontaire, son absence une coupure. C'est
+le seul fait qu'il garantit.
+
+Chaque ligne est écrite puis `fsync`'ée — sans quoi la dernière, justement celle qui
+compte, resterait dans un tampon perdu à la coupure. Le service tourne en `Nice=10` /
+`IOSchedulingClass=idle` et son `TimeoutStopSec=10` lui laisse le temps d'écrire son
+marqueur, pas davantage. Écrit en **Node** comme le reste de l'outillage du projet.
+
 ## Drop-ins `10-nonblocking.conf`
 
 Plusieurs unités portent `After=multi-user.target` : elles sont ordonnées **après** la
@@ -141,11 +158,21 @@ disparu — exactement la même provenance que le module SAM qui avait faussé u
 juillet (voir `patches/README.md`). Notre arbre, lui, ne les construit pas : les options
 sont `=y`.
 
-`pstore` n'a jamais été affecté — il tourne depuis le code intégré :
+`pstore` n'a jamais été affecté par ce problème de modules — il tourne depuis le code
+intégré :
 
 ```
 [    0.019995] pstore: Registered ramoops as persistent store backend
 ```
+
+⚠️ **Mais s'enregistrer n'est pas retenir.** Constaté le 2026-08-27 : ramoops ne conserve
+rien sur cette machine. `ramoops: uncorrectable error in header` apparaît à **chaque**
+démarrage — y compris après un redémarrage propre, donc après un simple reset à chaud.
+Vérifié sur 7 démarrages consécutifs, `/sys/fs/pstore` et `/var/lib/systemd/pstore` sont
+restés vides : **aucune trace n'a jamais été capturée**. Le contenu de la zone réservée
+`0xa0000000` ne survit pas à la chaîne UEFI/slbounce. Conséquence directe : un `pstore`
+vide après un incident **ne prouve rien** et ne doit jamais servir d'élément de preuve.
+Voir `/data/sp12data/temoin/LISEZ-MOI.md` pour le relevé mis en place à la place.
 
 Correctif appliqué : les deux `.ko` renommés en `*.etranger-inutilisable`, puis
 `sudo depmod -a`. `grep -c "reed_solomon\|ramoops" /lib/modules/$(uname -r)/modules.dep`

@@ -148,7 +148,39 @@ Limite connue : sans `IP_MULTIPLE_TABLES`, Tailscale crée ses chaînes `ts-inpu
 `IP_MULTIPLE_TABLES` compilés dans le noyau.
 
 ## Debug EL2 / ramoops
-Pour capturer un hang au boot EL2 (via slbounce), activer AVANT le build :
-`scripts/config -e PSTORE -e PSTORE_RAM -e PSTORE_CONSOLE -e PSTORE_PMSG && make olddefconfig`
-puis réserver une région ramoops (nœud `reserved-memory` dans le DTS, ou cmdline
-`ramoops.mem_address=.../mem_size=...`). Après un boot EL2 figé + reset, relire `/sys/fs/pstore`.
+
+⚠️ **Cette recette ne fonctionne pas sur cette machine — corrigé le 2026-08-27.**
+
+Elle a été appliquée : `PSTORE`, `PSTORE_RAM` et `PSTORE_CONSOLE` sont `=y`, la région est
+réservée dans le DTS (`ramoops@a0000000`, 1 Mio), le noyau enregistre bien le backend et
+active la console `ramoops-1`. **Et pourtant rien n'est jamais capturé.**
+
+`ramoops: uncorrectable error in header` apparaît à **chaque** démarrage, y compris après
+un redémarrage propre — donc après un reset à chaud, où la DRAM devrait être intacte.
+Vérifié sur 7 démarrages consécutifs : `/sys/fs/pstore` et `/var/lib/systemd/pstore` vides.
+Le contenu de la zone ne survit à aucun passage par la chaîne UEFI/slbounce, ce qui est
+cohérent avec un Secure Launch qui réinitialise la mémoire.
+
+**Ne pas conclure d'un `pstore` vide.** Il l'est toujours.
+
+### Ce qu'il faudrait à la place
+
+`pstore-blk` écrit sur un périphérique bloc au lieu de la DRAM :
+
+```
+scripts/config -e PSTORE_BLK -e PSTORE_ZONE && make olddefconfig
+```
+
+Audit ABI passé le 2026-08-27 — `CONFIG_PSTORE_BLK`, `PSTORE_ZONE`, `PSTORE_RAM` et
+`PSTORE_COMPRESS` touchent **0 en-tête partagé** (`include/net/`, `include/linux/`,
+`include/uapi/`), donc aucune rupture d'ABI des modules.
+
+Contrainte : il écrit **en brut** sur le périphérique désigné par
+`CONFIG_PSTORE_BLK_BLKDEV` — le pointer sur une partition utilisée la détruirait. Il lui
+faut une partition dédiée. 1,3 Gio sont libres en fin de `/dev/sda` (secteurs 124634368 à
+124966906) ; quelques Mio suffisent. La table de partitions du disque de démarrage ne se
+modifie pas sans décision explicite.
+
+En attendant, un relevé périodique fsync'é tient lieu de témoin — il ne dit pas *pourquoi*
+la machine est tombée, mais dans quel état elle était et si l'arrêt était volontaire.
+Voir `/data/sp12data/temoin/LISEZ-MOI.md`.
