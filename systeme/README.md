@@ -126,6 +126,42 @@ n'existe — ce qui ressemble, là encore, à une déconnexion de compte.
 Le drop-in est au niveau du **gabarit** (`onedriver@.service.d`), pas de l'instance : il
 s'applique quel que soit le point de montage. Rien à adapter pour le réutiliser ailleurs.
 
+## `/etc/UPower/UPower.conf` — la machine n'avait aucune protection batterie
+
+Constaté le 2026-09-03 : laissée débranchée, la machine descend jusqu'à la **coupure
+matérielle** au lieu de s'arrêter proprement. Relevé par le témoin, décharge du 1er au
+2 septembre : 33,74 Wh à 09:39, puis décroissance régulière sur 19 h jusqu'à 0,00 Wh, la
+tension tombant à **6,07 V** — 3,03 V par cellule, le seuil de coupure.
+
+La chaîne causale, vérifiée de bout en bout :
+
+| | |
+|---|---|
+| `CanSuspend` / `CanHibernate` / `CanHybridSleep` | **no** — aucun état de veille ne fonctionne ici |
+| `resume=` dans la ligne de commande | absent, malgré un swapfile de 4 Go |
+| `CriticalPowerAction` | `Auto` |
+| `AllowRiskyCriticalPowerAction` | `false` |
+
+`Auto` tente HybridSleep, puis Hibernate, puis PowerOff. Les deux premiers sont impossibles
+sur cette machine ; le troisième est **refusé** par le drapeau « risky ». upower n'avait
+donc **aucune action possible** au seuil de 2 % et ne faisait rien.
+
+Correctif — deux lignes :
+
+```
+CriticalPowerAction=PowerOff
+AllowRiskyCriticalPowerAction=true
+```
+
+Sauvegarde en `UPower.conf.avant-criticalaction-20260903`. Le drapeau s'appelle « risky »
+parce qu'une extinction forcée perd le travail non enregistré : c'est exactement ce que
+faisait déjà la coupure à 6,07 V, en y ajoutant le risque pour le système de fichiers et
+l'usure de la batterie.
+
+⚠️ Ne pas lire ceci comme « les redémarrages spontanés sont résolus ». Une seule des trois
+coupures récentes s'explique par la batterie ; les deux autres survenaient **sur secteur**,
+sans aucun précurseur.
+
 ## `modules-load.d/cdrecord.conf`
 
 Surcharge vide masquant `/usr/lib/modules-load.d/cdrecord.conf`, qui réclame le module
