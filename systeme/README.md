@@ -126,6 +126,42 @@ n'existe — ce qui ressemble, là encore, à une déconnexion de compte.
 Le drop-in est au niveau du **gabarit** (`onedriver@.service.d`), pas de l'instance : il
 s'applique quel que soit le point de montage. Rien à adapter pour le réutiliser ailleurs.
 
+## `pstore-blk` — remplacer une DRAM effacée par le disque
+
+Mis en place le 2026-09-03. ramoops ne retient **rien** ici (voir plus bas) : les vidages
+noyau allaient dans une zone DRAM que la chaîne UEFI/slbounce réinitialise. `pstore-blk`
+écrit sur un périphérique bloc à la place.
+
+**Sans recompiler le noyau.** `PSTORE_BLK` et `PSTORE_ZONE` sont `tristate`, donc
+constructibles en modules contre l'arbre existant — 17 secondes, contre ~28 minutes pour
+une reconstruction complète. Audit ABI passé : 0 en-tête partagé.
+
+⚠️ Le `+` de `setlocalversion`. L'arbre annonce `7.1.0-next-20260626-nft+` alors que le
+noyau courant est `…-nft`. Sans `KERNELRELEASE=7.1.0-next-20260626-nft` explicite au
+`make`, le vermagic ne correspond pas et les modules refusent de se charger.
+
+**Partition dédiée obligatoire** : `pstore-blk` écrit en **brut** sur le périphérique qu'on
+lui désigne. `/dev/sda4` (`SP12PSTORE`, 32 Mio) a été taillée dans l'espace libre de fin de
+disque ; table de partitions sauvegardée dans `/data/sp12data/gpt-sda.avant-pstore-20260903`.
+
+Deux pièges rencontrés au chargement :
+
+- `blkdev=PARTUUID=…` échoue en `-2`. Cette forme n'est résolue qu'au démarrage précoce,
+  pas depuis un module chargé à chaud. Utiliser un chemin réel — ici
+  `/dev/disk/by-partuuid/…`.
+- `pstore: backend 'ramoops' already in use: ignoring 'pstore_blk'`. Le noyau n'accepte
+  **qu'un** backend pstore, et ramoops, intégré et déclaré par le DTB, prend la place.
+  D'où `pstore.backend=pstore_blk` sur la ligne de commande — ajouté à la **seule** entrée
+  d'usage courant, l'entrée de secours figée restant inchangée.
+
+⚠️ **Ce que cela ne résoudra pas.** Les coupures observées ne produisent aucune panique :
+le noyau ne tombe pas, il s'arrête. `max_reason=2` ne déclenche que sur Oops et Panic, donc
+aucun vidage ne sera écrit pour ce type d'événement. C'est la **zone console**
+(`console_size=2048`) qui a une chance d'être utile : elle enregistre en continu la sortie
+console du noyau, et devrait donc conserver les derniers messages avant une coupure franche.
+Avec `best_effort=1` — le pilote UFS n'expose pas de support pstore dédié — l'écriture passe
+par la couche bloc ordinaire, sans garantie que les tout derniers octets atteignent le disque.
+
 ## `/etc/UPower/UPower.conf` — la machine n'avait aucune protection batterie
 
 Constaté le 2026-09-03 : laissée débranchée, la machine descend jusqu'à la **coupure
