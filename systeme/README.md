@@ -147,8 +147,10 @@ disque ; table de partitions sauvegardée dans `/data/sp12data/gpt-sda.avant-pst
 Deux pièges rencontrés au chargement :
 
 - `blkdev=PARTUUID=…` échoue en `-2`. Cette forme n'est résolue qu'au démarrage précoce,
-  pas depuis un module chargé à chaud. Utiliser un chemin réel — ici
-  `/dev/disk/by-partuuid/…`.
+  pas depuis un module chargé à chaud. Il faut un chemin réel : on utilise
+  `/dev/disk/by-partlabel/SP12PSTORE`, lisible et stable. Le PARTUUID conviendrait aussi,
+  mais n'apprend rien à la lecture. Le PARTLABEL n'est pas garanti unique en général —
+  ici il l'est, un seul disque et une seule partition portant ce nom.
 - `pstore: backend 'ramoops' already in use: ignoring 'pstore_blk'`. Le noyau n'accepte
   **qu'un** backend pstore, et ramoops, intégré et déclaré par le DTB, prend la place.
   D'où `pstore.backend=pstore_blk` sur la ligne de commande — ajouté à la **seule** entrée
