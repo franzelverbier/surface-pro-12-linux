@@ -1,0 +1,87 @@
+From 74d85fa0bbe8a80f1b891ddb606c6ad1fe400449 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Fran=C3=A7ois=20Roux?= <info@humanlearning.ch>
+Date: Fri, 4 Sep 2026 11:01:14 +0200
+Subject: [PATCH] remoteproc: qcom_q6v5_pas: Disable recovery when there is no
+ .start
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+qcom_pas_ops_no_reset is selected by "qcom,broken-reset" and provides only
+.attach, .da_to_va, .stop and .panic. There is no .start, because such a
+remoteproc was brought up by the boot firmware and the kernel only ever
+attaches to it.
+
+rproc_trigger_recovery() does not know that. It picks rproc_boot_recovery(),
+which reaches remoteproc_core.c and calls rproc->ops->start(rproc) with no
+NULL check. The recovery worker dies on the spot.
+
+Observed on a Microsoft Surface Pro 12in (X1P42100) booted at EL2 via
+slbounce, where the ADSP and CDSP are attached rather than started. An
+unprompted CDSP crash produced:
+
+	fatal error received: sleep_statsi.c:537
+	Unable to handle kernel NULL pointer dereference at virtual address 0
+	pc : 0x0
+	lr : rproc_start+0xc0
+
+and left the CDSP offline until the next reboot. The ADSP was untouched, so
+audio survived; an ADSP crash would have cost sound the same way.
+
+Recovery cannot work without .start in any case, so refuse it rather than
+crash trying. The condition is on ops->start rather than on the device-tree
+property, so any future ops set lacking .start is covered too -- the same
+test is already used two lines above to pick the auto_boot mode.
+
+The crash is reproducible on demand via debugfs:
+
+	echo 1 > /sys/kernel/debug/remoteproc/remoteproc1/crash
+
+Reported to Stephan Gerhold, who suggested this fix over the
+RPROC_FEAT_ATTACH_ON_RECOVERY approach first proposed.
+
+Not sent upstream: it applies to the out-of-tree attach series, which is
+not merged.
+
+Tool assistance, per Documentation/process/generated-content.rst: the
+diff and this commit message were produced in a long interactive session with
+an AI coding assistant. The human signer directed the work, ran the crash
+experiment and its control on the machine, and reviewed the result. The
+verification was empirical, on the hardware described.
+
+Assisted-by: Claude:claude-opus-5
+Signed-off-by: François Roux <info@humanlearning.ch>
+---
+ drivers/remoteproc/qcom_q6v5_pas.c | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
+
+diff --git a/drivers/remoteproc/qcom_q6v5_pas.c b/drivers/remoteproc/qcom_q6v5_pas.c
+index 89b134b331fb..566296b8dcd0 100644
+--- a/drivers/remoteproc/qcom_q6v5_pas.c
++++ b/drivers/remoteproc/qcom_q6v5_pas.c
+@@ -825,6 +825,22 @@ static int qcom_pas_probe(struct platform_device *pdev)
+ 	} else {
+ 		rproc->auto_boot = RPROC_AUTO_BOOT_DISABLED;
+ 	}
++	/*
++	 * An attach-only remoteproc has no .start: qcom_pas_ops_no_reset is
++	 * selected by "qcom,broken-reset" and provides only .attach, .da_to_va,
++	 * .stop and .panic. rproc_trigger_recovery() nevertheless picks
++	 * rproc_boot_recovery(), which calls rproc->ops->start() with no NULL
++	 * check -- observed on a Surface Pro 12in (X1P42100) booted at EL2,
++	 * where an unprompted CDSP crash took the recovery worker down with a
++	 * NULL pointer dereference at pc 0x0, lr rproc_start+0xc0, and left the
++	 * DSP offline until reboot.
++	 *
++	 * Recovery cannot work without .start anyway, so refuse it outright
++	 * rather than crash trying.
++	 */
++	if (!ops->start)
++		rproc->recovery_disabled = true;
++
+ 	rproc_coredump_set_elf_info(rproc, ELFCLASS32, EM_NONE);
+ 
+ 	pas = rproc->priv;
+-- 
+2.55.0
+

@@ -306,3 +306,37 @@ EDP_PANEL_ENTRY('B','O','E', 0x0cc9, &delay_200_500_e50, "NE120DRM-N28"),
 `find_edp_panel()` retourne la première correspondance dans ses deux passes, et les deux
 portent le même nom : les délais `e80` gagnent, les `e50` sont inatteignables. Sans
 matériel BOE sous la main, impossible de dire lesquels sont justes — signalé, non corrigé.
+
+## `0010` — recovery désactivée quand il n'y a pas de `.start`
+
+Ajouté le 2026-09-04. Ferme l'oops CDSP rapporté le 11 août.
+
+`qcom_pas_ops_no_reset`, sélectionné par `qcom,broken-reset`, ne fournit que
+`.attach`, `.da_to_va`, `.stop` et `.panic`. `rproc_trigger_recovery()` l'ignore et
+choisit `rproc_boot_recovery()`, qui appelle `rproc->ops->start(rproc)` sans test de
+nullité. Le worker de reprise meurt sur place.
+
+⚠️ **Le correctif suggéré par Stephan Gerhold en août n'avait jamais été appliqué.** Il
+avait été vérifié par expérience via debugfs, puis oublié : la machine est restée exposée
+au plantage qu'elle avait elle-même rapporté, du 12 août au 4 septembre. Un correctif
+validé mais non écrit ne protège personne.
+
+La condition porte sur `ops->start` et non sur la propriété DT — le même test sert déjà
+deux lignes plus haut à choisir le mode `auto_boot`, et tout futur jeu d'opérations sans
+`.start` est ainsi couvert.
+
+Reproductible à la demande :
+
+```bash
+echo 1 | sudo tee /sys/kernel/debug/remoteproc/remoteproc1/crash
+```
+
+Vérification : `sudo cat /sys/kernel/debug/remoteproc/remoteproc*/recovery` doit renvoyer
+`disabled` après le prochain démarrage. Avant le correctif, et jusqu'au redémarrage,
+il renvoie `enabled`.
+
+`CONFIG_QCOM_Q6V5_PAS=m` : le module se reconstruit en 12 s sans toucher au noyau, avec
+`KERNELRELEASE=7.1.0-next-20260626-nft` forcé. Module installé, ancien conservé en
+`qcom_q6v5_pas.ko.avant-recovery-20260904`. **Non rechargé à chaud** : décharger le module
+appellerait `.stop` sur des DSP attachés par le firmware, sans garantie de rattachement.
+
