@@ -162,6 +162,31 @@ console du noyau, et devrait donc conserver les derniers messages avant une coup
 Avec `best_effort=1` — le pilote UFS n'expose pas de support pstore dédié — l'écriture passe
 par la couche bloc ordinaire, sans garantie que les tout derniers octets atteignent le disque.
 
+### `sp12-pstore-console-level.service` — sans quoi la zone console ne sert à rien
+
+Une console pstore reste soumise à `console_loglevel`. Avec notre `loglevel=3`, elle ne
+recevait que `crit`, `alert` et `emerg` : tout le contexte utile avant une coupure était
+filtré **avant** de l'atteindre. Mesuré, les trois cas :
+
+| message | niveau | `console_loglevel` | capturé |
+|---|---|---|---|
+| test | `<4>` | 3 | **non** |
+| test | `<2>` | 3 | oui |
+| test | `<4>` | 8 | oui |
+
+Le service relève le niveau à **7** (`emerg`..`info`, `debug` exclu) une fois le démarrage
+terminé. Le boot garde `loglevel=3`, l'écran reste propre ; le bureau une fois affiché,
+tty0 n'est plus visible, donc tout peut partir aux consoles sans que personne ne le voie.
+
+Seul effet perceptible : sur une console texte (`Ctrl+Alt+F3`), les messages noyau
+défilent. Réversible par `sudo systemctl stop sp12-pstore-console-level` — son `ExecStop`
+remet le niveau à 3.
+
+⚠️ **Le vidage de `pstore_zone` est asynchrone.** Vérifier la partition juste après une
+écriture ne montre rien et fait conclure à tort que la zone ne fonctionne pas — erreur
+commise ici, qui a coûté une hypothèse correcte abandonnée puis reprise. Laisser passer
+quelques secondes.
+
 ## `/etc/UPower/UPower.conf` — la machine n'avait aucune protection batterie
 
 Constaté le 2026-09-03 : laissée débranchée, la machine descend jusqu'à la **coupure

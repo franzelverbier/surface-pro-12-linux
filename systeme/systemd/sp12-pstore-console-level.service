@@ -1,0 +1,25 @@
+[Unit]
+Description=Relève le niveau console après le démarrage, pour la zone console de pstore-blk
+Documentation=file:///data/git/surface-pro-12-linux/systeme/README.md
+# Ordonné APRÈS la cible qui le réclame : celle-ci ne l'attend donc pas,
+# et le chemin critique du démarrage reste inchangé.
+After=multi-user.target
+# Sans pstore_blk chargé, ce service n'a aucun objet.
+After=systemd-modules-load.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+# loglevel=3 pendant tout le démarrage : l'écran reste propre, les 42
+# avertissements bénins documentés dans systeme/README.md restent masqués.
+# Une fois le bureau affiché, tty0 n'est plus visible — on peut donc tout
+# envoyer aux consoles, ce qui alimente la zone console de pstore-blk.
+#
+# 7 = emerg..info. Le niveau debug reste exclu, sinon le flot noierait la
+# zone et userait le disque pour rien.
+ExecStart=/usr/bin/dmesg -n 7
+# Au retour à loglevel=3 : dmesg -n 3, ou simplement arrêter ce service.
+ExecStop=/usr/bin/dmesg -n 3
+
+[Install]
+WantedBy=multi-user.target
