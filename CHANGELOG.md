@@ -18,6 +18,30 @@ All dates 2026. Kernel reference build is **`7.1.0-next-20260626`** unless noted
 - **2026-06-30** — Storage-strategy iterations (USB key → Ventoy vdisk → USB SSD); GPT-repair workflow for raw-writing a small image onto a large disk; WPA3-SAE Wi-Fi fix.
 - **~2026-07 (early)** — Moved to an **internal ext4 install**, dual-boot with Windows, for full reliability. Internal display + KDE + GPU accel working.
 - **2026-07-03** — HW video codec fixed (supplied `qcvss8380_pa.mbn`); `/dev/video0` + `/dev/video1` live. Audio confirmed working (topology now in linux-firmware). Battery telemetry identified as the main remaining issue.
+- **2026-09-05** — **The console zone survived — and the firmware log says why nothing else ever did.** Three cuts on 4 September (≈12:12, 19:33, 21:53 CEST), not the one FR noticed; the rate keeps climbing. For the first time this machine produced a post-mortem trace: `console-pstore_blk-0`, 3261 bytes. **ramoops failed 64 times; pstore-blk worked on its first attempt.**
+
+  What it contains is instructive in an unexpected way. The log stops at `[20.539678]` — end of boot — and the machine then ran **7 h 20 without the kernel emitting a single further line** before dying. That is not a capture gap: it starts at `[3.9]`, when the module loads, and the 2 MiB zone was nowhere near full. The kernel simply had nothing to say. Combined with the witness showing nothing abnormal on any sampled quantity 30 s before the cut, the fault is below Linux.
+
+  **An idle hypothesis, formed and refuted the same hour.** The two most recent cuts both happened at 37 °C, cpu0 at its 710 MHz floor, load 0.02–0.07 — so I proposed a PSCI deep-idle failure and a `cpuidle` experiment. A selection-bias check killed it: the machine is idle only **47.7 %** of the time, and across the six real cuts the split is **three at idle (load 0.02, 0.07, 0.16) and three under load (1.08, 1.42, 1.92)**, at 37 °C and at 50 °C alike. No correlation. Checking before proposing would have cost one command.
+
+  **The firmware logs are now readable.** Six `no-map` reserved regions — `cpucp-log`, `xbl-dtlog`, `xbl-ramdump`, `tme-crash-dump`, `tme-log`, `uefi-log` — carry no `compatible`, so no driver binds them, and `CONFIG_STRICT_DEVMEM=y` rules out `/dev/mem`. A 93-line read-only module (`sp12_fwdump`, `ioremap` + debugfs blobs, built in seconds against the existing tree) exposes them. The TME regions are high-entropy, encrypted or compressed — the "strings" in them are noise. `xbl-dtlog` and `uefi-log` are **plain text**.
+
+  And the XBL log settles an old question:
+
+```
+B - 304664 - PM: Reset by PSHOLD
+B - 304664 - PM: Reset Type: Hard Reset
+B - 304664 - PM: PON by CBLPWR
+B - 488762 - ddr_init = 1 cold boot
+```
+
+  **`ddr_init = 1 cold boot`.** The DRAM is re-initialised by firmware at every boot. That is the firmware-level explanation for ramoops never retaining anything across 64 boots, warm reboots included — the region is wiped below Linux, and no DRAM-based capture can work on this machine. Putting pstore on the disk was the only route.
+
+  ⚠️ **`Reset by PSHOLD` does not discriminate.** A normal Qualcomm reboot also drops PSHOLD, so this line looks identical after a clean shutdown and after a cut. The log is overwritten each boot, and the copy saved today follows a **cut**. The control is obvious and not yet run: reboot cleanly, capture again, diff. Only then does the line mean anything.
+
+  **A hypothesis disposed of before it reached the repo.** While comparing our DTS with upstream I noticed our `regulators-4` block (`qcom,pmc8380-rpmh-regulators`, `pmic-id = "f"`) has no upstream counterpart and registers no regulator on the machine, and I said it was probably inherited by copy-paste from another board. That claim never got committed — it was dropped when the comparison document was rewritten — but it was wrong and the reason is worth keeping. The XBL log enumerates the PMICs on the bus: `BUS: 0, PMIC A:2.1 B:2.1 C:2.0 D:2.0 E:2.0 **F:2.0** I:2.0 J:2.0 M:1.3`. **The "F" PMIC is physically present.** The block is not cruft; its regulators fail to register for a reason still unknown. Do not delete it on the strength of upstream omitting it.
+
+  ⚠️ The saved logs contain the machine serial number and must never be committed. They live in `/data/sp12data/fwdump/`, outside the repo.
 - **2026-09-04** — **First boot on `pstore-blk`: it works, and it was nearly useless.** The backend swap took: `pstore: backend 'pstore_blk' already in use: ignoring 'ramoops'`, then `Registered pstore_blk as persistent store backend` and `attached /dev/disk/by-partuuid/… (no dedicated panic_write!)`. The boot error FR spotted is ours and is benign — `ramoops … probe with driver ramoops failed with error -16`, i.e. `EBUSY`, ramoops declining because pstore_blk holds the slot. Diffing error-level messages against the previous boot: **exactly two new lines, both that**; the other seven pre-date the change and two disappeared. Writing was then proven, not assumed: on a partition zeroed beforehand, a pmsg write produced 49 bytes and the console zone grew to **2.1 MB**.
 
   **But `loglevel=3` was throttling it to almost nothing.** A pstore console is still a console, so `console_loglevel` filters what reaches it — only `crit` and above, which is none of the context that matters before a cut. Measured three ways: `<4>` at loglevel 3 **not** captured, `<2>` at loglevel 3 captured, `<4>` at loglevel 8 captured. Fixed by `sp12-pstore-console-level.service`, which raises the level to **7** (`emerg`..`info`, debug excluded) *after* boot: the boot screen keeps `loglevel=3` and stays clean, and once the desktop is up tty0 is not visible, so everything can go to the consoles unseen. Verified end to end — a `<4>` message emitted after the service now lands in the partition. Reversible with `systemctl stop`, whose `ExecStop` restores level 3.
