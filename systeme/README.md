@@ -12,6 +12,7 @@ faire tourner cette machine.
 | `modprobe.d/` | listes noires de modules |
 | `modules-load.d/` | neutralisations de demandes de chargement |
 | `bin/` | scripts appelés par les unités |
+| *(hors arborescence)* | deux pièges des paquets AUR sur aarch64 — voir plus bas |
 
 ## Les services, et pourquoi ils existent
 
@@ -224,6 +225,76 @@ l'usure de la batterie.
 ⚠️ Ne pas lire ceci comme « les redémarrages spontanés sont résolus ». Une seule des trois
 coupures récentes s'explique par la batterie ; les deux autres survenaient **sur secteur**,
 sans aucun précurseur.
+
+## Deux pièges des paquets AUR sur aarch64
+
+Rien à voir avec le noyau, mais les deux mordent sur cette machine et coûtent du temps.
+Exemple vécu le 2026-09-05 avec `claude-desktop`.
+
+### 1. L'API de l'AUR aplatit les dépendances par architecture
+
+```
+yay -S claude-desktop
+  -> Aucun paquet trouvé sur l'AUR correspondant à edk2-ovmf (requis par: claude-desktop)
+```
+
+`edk2-ovmf` est le firmware UEFI **x86** pour QEMU ; il n'existe pas sur Arch Linux ARM.
+
+Le PKGBUILD, lui, est correct :
+
+```bash
+depends_x86_64=('qemu-system-x86'     'edk2-ovmf')
+depends_aarch64=('qemu-system-aarch64' 'edk2-aarch64')
+```
+
+et le `.SRCINFO` sépare bien les deux. Mais **l'API RPC de l'AUR les fusionne** en une
+seule liste `Depends`. Les assistants qui s'y fient — yay, paru — réclament donc le paquet
+x86 sur ARM et refusent d'installer.
+
+`makepkg` lit le vrai PKGBUILD et applique la bonne branche :
+
+```bash
+git clone https://aur.archlinux.org/<paquet>.git && cd <paquet> && makepkg -si
+```
+
+⚠️ Ce n'est **pas** une erreur du mainteneur, et le signaler comme telle serait injuste.
+À vérifier avant d'accuser : `curl -s "https://aur.archlinux.org/rpc/v5/info?arg[]=<paquet>"`
+renvoie-t-il les dépendances des deux architectures mêlées ?
+
+### 2. Un paquet peut épingler une dépendance que l'amont a retirée
+
+Symptôme bien plus déroutant, car **entièrement silencieux**.
+
+`claude-desktop 1.40609.1` épingle, dans le manifeste embarqué de son `app.asar`, une
+version précise de son moteur — 2.1.255. Or elle avait été retirée du serveur :
+
+| | |
+|---|---|
+| `…/claude-code-releases/2.1.255/manifest.json` | **404** |
+| `…/claude-code-releases/2.1.260/manifest.json` | 200 |
+
+À chaque lancement, l'application créait le répertoire cible, échouait à le remplir, le
+laissait **vide** (0 fichier, 4 Kio) et se rabattait sur une copie plus ancienne restée sur
+le disque. Aucune trace dans ses journaux. Le seul symptôme visible était une
+fonctionnalité qui refusait de marcher, avec un message parlant d'une version trop
+ancienne — celle de la copie de repli, pas celle du paquet.
+
+Relancer l'application n'y changeait rien : le téléchargement échouait à l'identique.
+
+**Ce qu'il faut retenir**, et qui vaut pour tout paquet de ce genre :
+
+- un répertoire de version **présent mais vide** est le signe d'un téléchargement échoué,
+  pas d'une installation réussie — toujours vérifier le contenu, pas l'existence ;
+- l'application peut être **en retard sur l'amont** sans être signalée périmée. Ici la
+  1.46388.2 était publiée depuis des jours dans le dépôt officiel de l'éditeur, et le
+  paquet AUR pointait toujours sur la 1.40609.1 ;
+- reconstruire le PKGBUILD avec le `pkgver` à jour et l'empreinte recalculée suffit, sans
+  changer de dépôt ni recourir à un fork tiers.
+
+⚠️ Ne pas contourner un contrôle d'intégrité pour forcer les choses. Le répertoire de
+version contenait un marqueur `.verified` opaque, sans doute une attestation serveur :
+reproduire ce genre de valeur pour faire accepter un binaire non vérifié n'est pas une
+solution acceptable, même sur sa propre machine.
 
 ## `modules-load.d/cdrecord.conf`
 
