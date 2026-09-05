@@ -18,6 +18,24 @@ All dates 2026. Kernel reference build is **`7.1.0-next-20260626`** unless noted
 - **2026-06-30** — Storage-strategy iterations (USB key → Ventoy vdisk → USB SSD); GPT-repair workflow for raw-writing a small image onto a large disk; WPA3-SAE Wi-Fi fix.
 - **~2026-07 (early)** — Moved to an **internal ext4 install**, dual-boot with Windows, for full reliability. Internal display + KDE + GPU accel working.
 - **2026-07-03** — HW video codec fixed (supplied `qcvss8380_pa.mbn`); `/dev/video0` + `/dev/video1` live. Audio confirmed working (topology now in linux-firmware). Battery telemetry identified as the main remaining issue.
+- **2026-09-05 (later)** — **They are not crashes. The machine loses power.** The control the previous entry called for was run: reboot cleanly, capture the XBL log again, diff against the copy taken after the 4 September 21:52:57 cut.
+
+```
+after a cut          : PM: Reset Type: Hard Reset   |  PM: PON by CBLPWR
+after a clean reboot : PM: Reset Type: Shutdown     |  PM: PON by PWR key DEB
+```
+
+  **`PON by CBLPWR` is the decisive line.** The machine powered back on *because the cable was supplying current*. It is not resetting — it goes **fully off**, and the charger switches it on again. `Reset Type` discriminates too: `Hard Reset` against `Shutdown`.
+
+  This reconciles every negative result of the past three weeks. The kernel emits nothing because it never gets to react to a power loss — that is why `console-pstore_blk-0` held the boot and then 7 h 20 of silence. There is no thermal, load or memory correlation because none of those is involved; the cuts fall at idle and under load alike, at 37 °C and at 50 °C. Every instrument we built returned "nothing abnormal" because, from Linux, there was nothing abnormal to see.
+
+  **The acceleration becomes evidence rather than a worry.** 5 cuts in the 24 days to 20 August, 6 in the 8 days to 3 September, 3 on 4 September alone. That is the curve of a component degrading — charger, cable or connector — not of a software fault, which would strike at a constant rate.
+
+  **Next test, and it costs nothing: change the charger and the USB-C cable.** If the cuts stop, it is settled. If they persist on a different supply, the machine's own connector becomes the suspect. This is the first hypothesis in six weeks that is at once plausible, consistent with every measurement, and falsifiable in five minutes.
+
+  ⚠️ One reservation on the control. The clean reboot reports `PON by PWR key DEB` although no button was pressed — `systemctl reboot` was issued. The power-on trigger reported after a warm restart may simply be conventional, so **the `PON` half is weaker evidence than the `Reset Type` half**. The `Hard Reset` / `Shutdown` distinction is the solid one; `CBLPWR` is what gives it meaning, but do not lean on it alone.
+
+  Reference captures kept in `/data/sp12data/fwdump/` — `xbl-dtlog.apres-coupure-*` and `xbl-dtlog.apres-arret-propre-*`. Outside the repo: they carry the machine serial number.
 - **2026-09-05** — **The console zone survived — and the firmware log says why nothing else ever did.** Three cuts on 4 September (≈12:12, 19:33, 21:53 CEST), not the one FR noticed; the rate keeps climbing. For the first time this machine produced a post-mortem trace: `console-pstore_blk-0`, 3261 bytes. **ramoops failed 64 times; pstore-blk worked on its first attempt.**
 
   What it contains is instructive in an unexpected way. The log stops at `[20.539678]` — end of boot — and the machine then ran **7 h 20 without the kernel emitting a single further line** before dying. That is not a capture gap: it starts at `[3.9]`, when the module loads, and the 2 MiB zone was nowhere near full. The kernel simply had nothing to say. Combined with the witness showing nothing abnormal on any sampled quantity 30 s before the cut, the fault is below Linux.
@@ -37,7 +55,7 @@ B - 488762 - ddr_init = 1 cold boot
 
   **`ddr_init = 1 cold boot`.** The DRAM is re-initialised by firmware at every boot. That is the firmware-level explanation for ramoops never retaining anything across 64 boots, warm reboots included — the region is wiped below Linux, and no DRAM-based capture can work on this machine. Putting pstore on the disk was the only route.
 
-  ⚠️ **`Reset by PSHOLD` does not discriminate.** A normal Qualcomm reboot also drops PSHOLD, so this line looks identical after a clean shutdown and after a cut. The log is overwritten each boot, and the copy saved today follows a **cut**. The control is obvious and not yet run: reboot cleanly, capture again, diff. Only then does the line mean anything.
+  ⚠️ **`Reset by PSHOLD` does not discriminate.** A normal Qualcomm reboot also drops PSHOLD, so this line looks identical after a clean shutdown and after a cut. The log is overwritten each boot, and the copy saved today follows a **cut**. The control is obvious: reboot cleanly, capture again, diff. **It was run the same day — see the entry above. The PSHOLD line indeed does not discriminate, but the two lines beside it do, and they overturn the whole reading of these events.**
 
   **A hypothesis disposed of before it reached the repo.** While comparing our DTS with upstream I noticed our `regulators-4` block (`qcom,pmc8380-rpmh-regulators`, `pmic-id = "f"`) has no upstream counterpart and registers no regulator on the machine, and I said it was probably inherited by copy-paste from another board. That claim never got committed — it was dropped when the comparison document was rewritten — but it was wrong and the reason is worth keeping. The XBL log enumerates the PMICs on the bus: `BUS: 0, PMIC A:2.1 B:2.1 C:2.0 D:2.0 E:2.0 **F:2.0** I:2.0 J:2.0 M:1.3`. **The "F" PMIC is physically present.** The block is not cruft; its regulators fail to register for a reason still unknown. Do not delete it on the strength of upstream omitting it.
 

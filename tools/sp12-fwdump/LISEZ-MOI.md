@@ -37,9 +37,21 @@ B - 488762 - ddr_init = 1 cold boot
 l'explication, au niveau firmware, de l'échec de ramoops sur 64 démarrages — redémarrages
 propres compris. **Aucune capture en DRAM ne peut fonctionner sur cette machine.**
 
-⚠️ **`Reset by PSHOLD` ne discrimine pas.** Un `reboot` normal sous Qualcomm passe aussi par
-PSHOLD. Pour que cette ligne signifie quelque chose, il faut le contrôle : redémarrer
-proprement, recapturer, comparer. Non fait à ce jour.
+⚠️ **`Reset by PSHOLD` ne discrimine pas** — les deux cas la portent. **Mais les deux lignes
+voisines, si.** Contrôle fait le 2026-09-05 :
+
+| | après coupure | après arrêt propre |
+|---|---|---|
+| `Reset Type` | **Hard Reset** | **Shutdown** |
+| `PON by` | **CBLPWR** | **PWR key DEB** |
+
+`PON by CBLPWR` signifie que la machine s'est rallumée *parce que le câble fournissait du
+courant*. Elle ne redémarre donc pas : elle **s'éteint complètement**, et le chargeur la
+remet en marche. Les coupures sont des pertes d'alimentation, pas des plantages.
+
+Réserve : l'arrêt propre rapporte `PON by PWR key DEB` alors qu'aucun bouton n'a été
+pressé — c'est un `systemctl reboot`. La moitié `PON` est donc une preuve plus faible que
+la moitié `Reset Type`. C'est `Hard Reset` contre `Shutdown` qui tient.
 
 ## Usage
 
