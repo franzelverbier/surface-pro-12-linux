@@ -18,6 +18,22 @@ All dates 2026. Kernel reference build is **`7.1.0-next-20260626`** unless noted
 - **2026-06-30** — Storage-strategy iterations (USB key → Ventoy vdisk → USB SSD); GPT-repair workflow for raw-writing a small image onto a large disk; WPA3-SAE Wi-Fi fix.
 - **~2026-07 (early)** — Moved to an **internal ext4 install**, dual-boot with Windows, for full reliability. Internal display + KDE + GPU accel working.
 - **2026-07-03** — HW video codec fixed (supplied `qcvss8380_pa.mbn`); `/dev/video0` + `/dev/video1` live. Audio confirmed working (topology now in linux-firmware). Battery telemetry identified as the main remaining issue.
+- **2026-09-09** — **The trigger is waking the machine, and FR found it — not the instrumentation.** After three weeks of measuring, the decisive observation came in one sentence: *« c'est presque à chaque fois lorsque l'ordinateur se met en veille ou baisse la luminosité à sa reprise »*. It is right, and the journal confirms it with a control I should have run weeks earlier:
+
+| last kernel event = Bluetooth trackball reconnect | |
+|---|---|
+| before a **cut** | **6 / 10 — 60 %** |
+| before a **clean shutdown** | **3 / 123 — 2 %** |
+
+  A 30× enrichment. A Bluetooth mouse reconnecting is the user coming back to the machine. **The cuts cluster on resume.** That also explains what had puzzled me: three cuts at load 0.02–0.16 and three at 1.08–1.92 are the same event sampled 30 s apart — screen off on one side, desktop waking on the other, one of them showing load climb 0.11 → 5.34 and temperature 37 → 46 °C in three minutes.
+
+  Note there is no system sleep here at all: `CanSuspend`, `CanHibernate`, `CanHybridSleep` are all **no**. What FR calls veille is DPMS blanking and backlight dimming, so the trigger lies in the panel/backlight power path.
+
+  **Result of disabling it** (`DPMSControl` and `DimDisplay` at 86400 s on all three profiles, autolock off, 2026-09-05 15:48): over the next 96 h, **2 cuts instead of the ~7.8 the preceding rate predicted**, and uptimes of 46.6 h and 30.2 h where hours had been the norm. **Reduced, not eliminated** — one of the two was still preceded by a trackball reconnect, the other by nothing relevant. ⚠️ The 1.96/day baseline was itself an exceptional burst, and we had already seen 427 h of silence with nothing changed, so the factor is soft. What is solid is the lengthened uptime.
+
+  **Two of my own readings were wrong and are struck above.** I built a charger-degradation story on unnormalised counts; normalised by uptime the curve dips to 0.06/day over 408 hours in early August before rising again — that is not degradation. And `Image-nft` ran **329 of those quiet hours**, which exonerates the rebuild: same kernel, rate multiplied by thirty.
+
+  Separately, and **not** the cause of anything: one OOM on 9 September at 12:07, `python3` killed at **10.5 GB RSS**, launched inside a Tailscale SSH session that closed two minutes later. Single occurrence in the whole journal. The cut came **77 minutes later**, with 7.8 GB free and load 0.1 in the witness — the machine had fully recovered. The last kernel line before a cut is not its cause; that is the third time this trap has been logged here.
 - **2026-09-05 (later)** — **They are not crashes. The machine loses power.** The control the previous entry called for was run: reboot cleanly, capture the XBL log again, diff against the copy taken after the 4 September 21:52:57 cut.
 
 ```
@@ -29,9 +45,9 @@ after a clean reboot : PM: Reset Type: Shutdown     |  PM: PON by PWR key DEB
 
   This reconciles every negative result of the past three weeks. The kernel emits nothing because it never gets to react to a power loss — that is why `console-pstore_blk-0` held the boot and then 7 h 20 of silence. There is no thermal, load or memory correlation because none of those is involved; the cuts fall at idle and under load alike, at 37 °C and at 50 °C. Every instrument we built returned "nothing abnormal" because, from Linux, there was nothing abnormal to see.
 
-  **The acceleration becomes evidence rather than a worry.** 5 cuts in the 24 days to 20 August, 6 in the 8 days to 3 September, 3 on 4 September alone. That is the curve of a component degrading — charger, cable or connector — not of a software fault, which would strike at a constant rate.
+  ~~**The acceleration becomes evidence rather than a worry.** … That is the curve of a component degrading — charger, cable or connector.~~ ⚠️ **Struck on 2026-09-09.** Two mistakes here. The counts were never normalised by uptime, and once they are the curve is not monotonic at all: 0.48/day in late July, **0.06/day over 408 hours in early August**, 0.38, then 1.96 — a dip, not a degradation. And the journal only reaches back to 27 July because it had been rotated, so it says nothing about whether this predates our work. FR's memory says it does not, and nothing in my data contradicts him.
 
-  **Next test, and it costs nothing: change the charger and the USB-C cable.** If the cuts stop, it is settled. If they persist on a different supply, the machine's own connector becomes the suspect. This is the first hypothesis in six weeks that is at once plausible, consistent with every measurement, and falsifiable in five minutes.
+  ~~**Next test: change the charger and the USB-C cable.**~~ Done, and it changed nothing — **the hypothesis was wrong**. The real trigger came from FR, not from the data I was mining: *« c'est presque à chaque fois lorsque l'ordinateur se met en veille ou baisse la luminosité à sa reprise »*. See the 2026-09-09 entry.
 
   ⚠️ One reservation on the control. The clean reboot reports `PON by PWR key DEB` although no button was pressed — `systemctl reboot` was issued. The power-on trigger reported after a warm restart may simply be conventional, so **the `PON` half is weaker evidence than the `Reset Type` half**. The `Hard Reset` / `Shutdown` distinction is the solid one; `CBLPWR` is what gives it meaning, but do not lean on it alone.
 

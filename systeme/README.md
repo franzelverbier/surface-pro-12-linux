@@ -226,6 +226,46 @@ l'usure de la batterie.
 coupures récentes s'explique par la batterie ; les deux autres survenaient **sur secteur**,
 sans aucun précurseur.
 
+## `powerdevilrc` — extinction d'écran désactivée, à titre de diagnostic
+
+⚠️ **Réglage de test, pas un correctif définitif.** Posé le 2026-09-05 à 15:48.
+
+Les coupures franches de la machine se groupent à la **reprise** : le dernier événement
+noyau est une reconnexion de souris Bluetooth dans **60 %** des cas, contre **2 %** avant
+un arrêt propre — soit une trentaine de fois plus. Une souris qui se reconnecte, c'est
+l'utilisateur qui revient.
+
+Il n'y a aucune veille système sur cette machine (`CanSuspend`, `CanHibernate`,
+`CanHybridSleep` valent tous **non**) : ce qui s'endort, c'est l'écran. Le déclencheur est
+donc dans le chemin panneau/rétroéclairage.
+
+```
+[AC][DPMSControl]   idleTime=86400
+[AC][DimDisplay]    idleTime=86400
+```
+
+idem pour `Battery` et `LowBattery`, plus `Autolock=false` dans `kscreenlockerrc` — le
+verrouillage éteint aussi l'écran.
+
+Valeurs de 24 h plutôt qu'un « jamais » : le résultat est le même et ne dépend d'aucune
+supposition sur la sémantique de powerdevil.
+
+**Résultat sur 96 h** : 2 coupures au lieu des ~7,8 que le taux précédent prédisait, et des
+uptimes de 46,6 h et 30,2 h là où l'on comptait en heures. **Réduit, pas supprimé.**
+
+⚠️ Deux réserves. Le taux de référence était lui-même une grappe exceptionnelle — on avait
+déjà vu 427 h de silence sans rien changer — donc le facteur est mou ; ce qui tient, c'est
+l'allongement des uptimes. Et le test désactive **trois choses à la fois** : extinction,
+atténuation et verrouillage. Pour savoir laquelle comptait, il faudra les réactiver une par
+une.
+
+Sauvegardes : `~/.config/powerdevilrc.avant-test-ecran-20260905-1548` et
+`kscreenlockerrc.avant-test-ecran-20260905-1548`. Un `cp` restaure l'état d'origine.
+
+Restent actifs et pouvant déclencher la même séquence : rabattre le clavier (événement
+*lid*, qui passe par un autre chemin que powerdevil) et l'endormissement de la souris
+Bluetooth elle-même.
+
 ## Deux pièges des paquets AUR sur aarch64
 
 Rien à voir avec le noyau, mais les deux mordent sur cette machine et coûtent du temps.
