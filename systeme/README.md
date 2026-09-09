@@ -250,14 +250,27 @@ verrouillage éteint aussi l'écran.
 Valeurs de 24 h plutôt qu'un « jamais » : le résultat est le même et ne dépend d'aucune
 supposition sur la sémantique de powerdevil.
 
-**Résultat sur 96 h** : 2 coupures au lieu des ~7,8 que le taux précédent prédisait, et des
-uptimes de 46,6 h et 30,2 h là où l'on comptait en heures. **Réduit, pas supprimé.**
+**Résultat sur 96 h : aucune amélioration mesurable.**
 
-⚠️ Deux réserves. Le taux de référence était lui-même une grappe exceptionnelle — on avait
-déjà vu 427 h de silence sans rien changer — donc le facteur est mou ; ce qui tient, c'est
-l'allongement des uptimes. Et le test désactive **trois choses à la fois** : extinction,
-atténuation et verrouillage. Pour savoir laquelle comptait, il faudra les réactiver une par
-une.
+| phase | uptime | coupures | taux |
+|---|---|---|---|
+| tout actif (1er août → 5 sept) | 854 h | 13 | **0,37/jour** |
+| tout désactivé (5 → 9 sept) | 96 h | 2 | **0,50/jour** |
+
+⚠️ J'avais d'abord annoncé une division par quatre. **C'était faux** : je comparais à
+1,96/jour, le taux d'une grappe de trois jours, au lieu du 0,37/jour de fond. Rapporté à la
+vraie référence, le taux ne baisse pas — il est même légèrement supérieur, et 96 heures
+portant 2 événements ont un intervalle de confiance qui avale les deux lectures.
+
+Ce qui tient, c'est la corrélation **60 % contre 2 %**, appuyée sur un contrôle et non sur
+une comparaison de taux. Ce qui ne tient pas, c'est l'idée que couper l'écran ait aidé.
+
+Et le test désactivait **trois choses à la fois**. La réactivation une par une a commencé
+le 2026-09-09 à 16:00 avec l'atténuation seule (300 s). Bornes des phases et script de
+bilan : `/data/sp12data/experience-coupures.md` et `/home/franz/bilan-coupures.sh`.
+
+⏱️ **Compter en semaines.** Avec un taux de fond de 0,4/jour et des silences déjà observés
+de 427 heures, il faut au bas mot dix jours par phase pour distinguer un effet du bruit.
 
 Sauvegardes : `~/.config/powerdevilrc.avant-test-ecran-20260905-1548` et
 `kscreenlockerrc.avant-test-ecran-20260905-1548`. Un `cp` restaure l'état d'origine.

@@ -29,7 +29,16 @@ All dates 2026. Kernel reference build is **`7.1.0-next-20260626`** unless noted
 
   Note there is no system sleep here at all: `CanSuspend`, `CanHibernate`, `CanHybridSleep` are all **no**. What FR calls veille is DPMS blanking and backlight dimming, so the trigger lies in the panel/backlight power path.
 
-  **Result of disabling it** (`DPMSControl` and `DimDisplay` at 86400 s on all three profiles, autolock off, 2026-09-05 15:48): over the next 96 h, **2 cuts instead of the ~7.8 the preceding rate predicted**, and uptimes of 46.6 h and 30.2 h where hours had been the norm. **Reduced, not eliminated** — one of the two was still preceded by a trackball reconnect, the other by nothing relevant. ⚠️ The 1.96/day baseline was itself an exceptional burst, and we had already seen 427 h of silence with nothing changed, so the factor is soft. What is solid is the lengthened uptime.
+  **Result of disabling it** (`DPMSControl` and `DimDisplay` at 86400 s on all three profiles, autolock off, 2026-09-05 15:48): **no measurable improvement.**
+
+| phase | uptime | cuts | rate |
+|---|---|---|---|
+| everything on (1 Aug → 5 Sep) | 854 h | 13 | **0.37/day** |
+| everything off (5 → 9 Sep) | 96 h | 2 | **0.50/day** |
+
+  ⚠️ **I first reported this as a 4× reduction. That was wrong**, and wrong in the exact way I had logged a warning about hours earlier in this same entry: I compared against **1.96/day, the rate of a three-day burst**, instead of the 0.37/day background over the whole period. Against the real baseline the rate did not fall — it is marginally higher, and 96 h holding 2 events carries a confidence interval wide enough to swallow either reading.
+
+  What survives is the **60 % vs 2 % correlation**, which rests on a control rather than on a rate comparison. What does not survive is any claim that disabling the screen helped. The uptimes of 46.6 h and 30.2 h are real but prove nothing on their own — the machine had already gone 427 h with nothing changed.
 
   **Two of my own readings were wrong and are struck above.** I built a charger-degradation story on unnormalised counts; normalised by uptime the curve dips to 0.06/day over 408 hours in early August before rising again — that is not degradation. And `Image-nft` ran **329 of those quiet hours**, which exonerates the rebuild: same kernel, rate multiplied by thirty.
 
