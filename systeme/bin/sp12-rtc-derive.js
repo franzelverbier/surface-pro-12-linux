@@ -30,10 +30,18 @@ const R = (e) => Number(e.__REALTIME_TIMESTAMP) / 1e6;
 const M = (e) => Number(e.__MONOTONIC_TIMESTAMP) / 1e6;
 
 const rows = [];
+const ignores = [];
 for (let b = -(N - 1); b <= 0; b++) {
   let all;
   try { all = lignes(`-b ${b}`); } catch { continue; }
   if (all.length < 2) continue;
+
+  // L ancrage suppose que le NTP a corrige l horloge AVANT la fin du demarrage.
+  // Un demarrage trop court pour que timesyncd aboutisse donnerait des heures fausses
+  // sans le moindre signe : on le saute plutot que de publier un chiffre inventé.
+  const iSync = all.findIndex((e) =>
+    /Initial clock synchronization|Contacted time server|Synchronized to time server/.test(e.MESSAGE || ''));
+  if (iSync === -1) { ignores.push(b); continue; }
 
   const fin = all[all.length - 1];
   const vrai = (m) => R(fin) - (M(fin) - m);   // heure vraie, ancrée sur la fin (NTP OK)
@@ -54,6 +62,8 @@ const hms = (s) => {
          `${String(Math.round(a % 60)).padStart(2, '0')}s`;
 };
 
+if (ignores.length)
+  console.log(`(ignorés, NTP jamais synchronisé — heures non reconstructibles : ${ignores.join(' ')})\n`);
 console.log('boot | démarrage réel      | arrêt réel          | erreur RTC   | éteint avant');
 console.log('-----+---------------------+---------------------+--------------+-------------');
 rows.forEach((r, i) => {

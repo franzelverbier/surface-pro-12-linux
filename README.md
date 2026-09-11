@@ -61,12 +61,18 @@ limitations : **[`EL2-KVM.md`](EL2-KVM.md)**.
 | `iso/` | construction de l'ISO live et de l'installateur |
 | `build-scripts/` | étapes de construction du rootfs |
 | `scripts/` | sauvegarde, vérification d'artefacts, outils Windows (GPT, écriture disque) |
-| `systeme/` | `grub.cfg` de référence, config du noyau en cours, `modprobe.d` |
+| `systeme/` | `grub.cfg` de référence, config du noyau en cours, `modprobe.d`, outils de mesure dans `systeme/bin/` |
+| `tools/` | petits modules de lecture seule, pour aller voir ce que le noyau ne dit pas |
 | `docs/` | journaux de portage, état des pilotes, guides |
 
 Points d'entrée : **[`kernel/RECETTE-REBUILD.md`](kernel/RECETTE-REBUILD.md)** pour
 reconstruire le noyau, **[`EL2-KVM.md`](EL2-KVM.md)** pour l'accès EL2,
 **[`docs/DRIVERS-STATUS.md`](docs/DRIVERS-STATUS.md)** pour l'état détaillé du matériel.
+
+Enquêtes ouvertes : **[`kernel/PDC-X1E-CONTOURNEMENT.md`](kernel/PDC-X1E-CONTOURNEMENT.md)**
+— un contournement matériel amont appliqué à tort à ce silicium, en plein dans le chemin
+des interruptions de réveil ; **[`systeme/PCIE-PHY-INTERMITTENT.md`](systeme/PCIE-PHY-INTERMITTENT.md)**
+— le PHY PCIe qui échoue un démarrage sur huit et emporte le WiFi avec lui.
 
 ## Binaires propriétaires
 
