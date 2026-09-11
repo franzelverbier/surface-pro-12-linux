@@ -23,10 +23,14 @@ Add "qcom,rtc-offset" as a third source, tried after nvmem and before
 UEFI. The offset is (unix time - raw counter), read off an EL1 boot where the
 UEFI branch works.
 
-It is NOT stable over time, and the first version of this patch claimed
-otherwise. Measured here: 20 ms of error right after setting it, 3615 s two
-weeks later -- about 250 s/day, so the PMIC counter runs roughly 0.29 % slow
-against real time. A fixed value is good for hours, not weeks. It is only
+It is NOT stable over time, and two earlier versions of this text were wrong
+about how: the first called the offset constant, the second called it a
+~250 s/day drift inferred from two measurements. Reconstructed boot by boot
+over eight boots, it is a staircase, not a slope. The error moved 2.7 s across
+5.5 days of uptime -- ordinary crystal drift -- while 7194 s were lost entirely
+across power-off periods, and only long ones: six shutdowns of 17 s to 16 min
+cost nothing, one of 1 h 55 min cost 1 h 55 min, as if the counter had stopped.
+A fixed value is therefore good for a run, not across shutdowns. It is only
 useful where something else corrects the clock shortly after boot; on this
 machine NTP does, within a minute.
 
@@ -74,14 +78,14 @@ index e624f848c..4d13e3ff1 100644
 +	 * The offset is (unix time - raw counter). Read it off an EL1 boot,
 +	 * where the UEFI branch works, via the dev_info() in pm8xxx_rtc_probe().
 +	 *
-+	 * It is NOT stable over time. Measured on a Surface Pro 12in: 20 ms of
-+	 * error right after setting it, 3615 s two weeks later -- roughly
-+	 * 250 s/day, i.e. the PMIC counter runs about 0.29 % slow against real
-+	 * time. A fixed value is therefore good for hours, not weeks, and this
-+	 * is only useful where something else fixes the clock shortly after
++	 * It is NOT stable over time, and it degrades as a staircase, not as a
++	 * slope. Measured over eight boots on a Surface Pro 12in: 2.7 s of error
++	 * gained across 5.5 days of uptime, but 1 h 55 min lost across a single
++	 * 1 h 55 min shutdown, as if the counter had stopped while powered off.
++	 * A fixed value is therefore good for a run, not across shutdowns, and
++	 * this is only useful where something else fixes the clock shortly after
 +	 * boot. Here NTP does, within a minute; anything reading the clock
-+	 * before that sees an error that grows by ~4 minutes a day since the
-+	 * offset was last computed.
++	 * before that sees whatever every shutdown since has accumulated.
 +	 *
 +	 * Deliberately read-only: with neither nvmem nor UEFI,
 +	 * pm8xxx_rtc_update_offset() still returns -ENODEV, so a static offset

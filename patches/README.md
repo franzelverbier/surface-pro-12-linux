@@ -130,22 +130,44 @@ le `dev_info` que le correctif ajoute au probe.
 rtc-pm8xxx c42d000.spmi:pmic@0:rtc@6100: offset = 1749233527
 ```
 
-⚠️ **Ce décalage dérive, et cette note affirmait d'abord le contraire.** Mesuré au front de
-seconde contre une horloge NTP synchronisée :
+⚠️ **Ce décalage se dégrade — mais pas comme cette note l'a dit jusqu'ici.** Elle a d'abord
+affirmé qu'il était constant, puis qu'il dérivait d'environ 250 s par jour. Les deux sont
+faux, et la seconde erreur venait de **deux relevés reliés par une droite**.
 
-| Date | Erreur du RTC |
-|---|---|
-| 5 août, juste après réglage | **20 ms** |
-| 20 août | **3615 s** — 1 h 0 min 15 s |
+Reconstruit démarrage par démarrage — `systeme/bin/sp12-rtc-derive.js`, huit démarrages du
+5 au 11 septembre, **même DTB et même offset depuis le 5 août** :
 
-Environ **250 s par jour** : le compteur du PMIC tourne à peu près **0,29 % trop lentement**
-que le temps réel. Ce n'est pas de la dérive de quartz ordinaire, c'est un ordre de grandeur
-au-dessus. Une valeur figée vaut donc pour des heures, pas pour des semaines.
+| Démarrage | Erreur du RTC | Éteint juste avant |
+|---|---|---|
+| 05.09 08:26 | **0 s** | — |
+| 05.09 10:23 | **−1 h 54 min 58 s** | **1 h 55 min 31 s** |
+| 05.09 15:24 | −1 h 54 min 57 s | 4 min 15 s |
+| 06.09 08:56 | −1 h 55 min 01 s | 15 min 40 s |
+| 08.09 07:15 | −1 h 54 min 59 s | 50 s |
+| 09.09 13:26 | −1 h 54 min 58 s | 1 min 32 s |
+| 09.09 14:41 | −1 h 54 min 58 s | 17 s |
+| 11.09 07:19 | **−1 h 59 min 52 s** | **10 h 36 min 14 s** |
+
+Ce n'est pas une pente, c'est un **escalier**. Sur **5,46 jours cumulés de fonctionnement**
+l'erreur ne bouge que de **2,7 s** — soit 0,5 s/jour, une dérive de quartz parfaitement
+ordinaire. Les **7194 s** perdues le sont intégralement en travers d'**arrêts**, et
+seulement des arrêts longs : six arrêts de 17 s à 16 min n'ont rien coûté.
+
+Ce qu'un arrêt long coûte, en revanche, n'est pas établi : 1 h 55 min d'arrêt ont coûté
+1 h 55 min — le compteur s'est arrêté net — quand 10 h 36 min n'ont coûté que 4 min 54 s.
+L'hypothèse évidente est l'alimentation (éteinte sur secteur, le domaine always-on reste
+alimenté ; débranchée, le compteur s'arrête), et elle **n'est pas testée**.
+
+⚠️ Le relevé du 20 août — 3615 s — est **contredit** et ne doit pas être réutilisé : le
+5 septembre à 08:26, avec le même DTB et le même offset, l'erreur valait 0 s. Un décalage
+ne revient pas à zéro tout seul. Sa valeur, 1 h 0 min 15 s, ressemble à une heure de
+confusion UTC/local plus 15 s d'erreur réelle — exactement le piège `hwclock --show --utc`
+signalé plus bas.
 
 L'approche reste utilisable **parce qu'autre chose corrige l'heure peu après le démarrage** :
 ici le NTP, en moins d'une minute, et le correctif `onedriver` attend explicitement
 `NTPSynchronized`. Mais tout ce qui lit l'heure pendant cette minute voit une valeur fausse,
-d'autant plus fausse qu'on s'éloigne du dernier relevé.
+et l'écart ne se rattrape jamais seul : il grandit arrêt après arrêt.
 
 ⚠️ Si la batterie du PMIC se vide entièrement, le compteur brut repart : même symptôme en
 pire, toujours **sans aucun message**.

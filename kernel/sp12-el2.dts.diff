@@ -75,20 +75,30 @@
 #     Pour obtenir la valeur : démarrer une fois en EL1, où la branche UEFI
 #     fonctionne, et lire le dev_info ajouté par le correctif 0008.
 #
-#     ⚠️ CETTE VALEUR DÉRIVE, et cette note affirmait d'abord le contraire.
-#     Mesures au front de seconde contre une horloge NTP synchronisée :
+#     ⚠️ CETTE VALEUR SE DÉGRADE, et cette note s'est trompée deux fois sur la
+#     manière : elle a d'abord dit « constante », puis « ~250 s/jour ». C'est un
+#     escalier, pas une pente. Reconstruit sur huit démarrages du 5 au 11
+#     septembre, même DTB depuis le 5 août (systeme/bin/sp12-rtc-derive.js) :
 #
-#         5 août, juste après réglage      20 ms d'erreur
-#         20 août                        3615 s d'erreur
+#         5,46 j cumulés allumé              2,7 s d'erreur gagnée
+#         1 arrêt de 1 h 55 min          1 h 55 min perdue (compteur arrêté net)
+#         1 arrêt de 10 h 36 min             4 min 54 s perdues
+#         6 arrêts de 17 s à 16 min          rien
 #
-#     Soit environ 250 s par jour : le compteur du PMIC tourne à peu près
-#     0,29 % trop lentement. Une valeur figée vaut pour des heures, pas pour
-#     des semaines, et l'erreur croît de ~4 min par jour depuis le relevé.
+#     Le compteur du PMIC est donc juste à ~0,5 s/jour tant que la machine
+#     tourne ; tout l'écart se prend en travers des arrêts longs. Ce qu'un arrêt
+#     long coûte exactement n'est pas établi — l'hypothèse évidente, non testée,
+#     est l'alimentation (éteinte sur secteur le compteur tourne, débranchée il
+#     s'arrête).
+#
+#     ⚠️ Le relevé du 20 août (3615 s) est CONTREDIT par celui du 5 septembre
+#     08:26 (0 s, même DTB, même offset) : ne pas le réutiliser. Sa valeur,
+#     1 h 0 min 15 s, ressemble à une heure de confusion UTC/local plus 15 s.
 #
 #     Cela reste utilisable ici parce que le NTP corrige en moins d'une minute
 #     et que le correctif onedriver attend explicitement NTPSynchronized. Mais
-#     tout ce qui lit l'heure avant cela voit une valeur fausse, et l'écart
-#     grandit tant qu'on ne refait pas le relevé.
+#     tout ce qui lit l'heure avant cela voit une valeur fausse, et l'écart ne
+#     se rattrape jamais seul : il grandit arrêt après arrêt.
 #
 #     ⚠️ Si la batterie du PMIC se vide entièrement, le compteur brut repart :
 #     même symptôme en pire, toujours SANS AUCUN MESSAGE.
@@ -196,20 +206,20 @@
 +						 * reecrit qu'au-dela de 30 s de derive, donc le firmware
 +						 * tolere cet ecart et nous l'avions fidelement recopie.
 +						 *
-+						 * ATTENTION -- ce decalage N'EST PAS STABLE dans le temps,
-+						 * contrairement a ce que cette note affirmait d'abord.
-+						 * Mesures au front de seconde contre une horloge NTP :
-+						 *   5 aout, juste apres reglage   20 ms d'erreur
-+						 *   20 aout                       3615 s d'erreur
-+						 * Soit ~250 s par jour : le compteur du PMIC tourne environ
-+						 * 0,29 % trop lentement. Une valeur figee vaut pour des
-+						 * heures, pas pour des semaines, et l'erreur croit de ~4 min
-+						 * par jour depuis le dernier relevé.
++						 * ATTENTION -- ce decalage SE DEGRADE, et cette note s'est
++						 * trompee deux fois sur la maniere : "constante", puis
++						 * "~250 s/jour". C'est un escalier, pas une pente. Sur huit
++						 * demarrages (systeme/bin/sp12-rtc-derive.js) :
++						 *   5,46 j allume cumules       2,7 s d'erreur gagnee
++						 *   arret de 1 h 55 min         1 h 55 min perdue, net
++						 *   arret de 10 h 36 min        4 min 54 s perdues
++						 *   6 arrets de 17 s a 16 min   rien
++						 * Le releve du 20 aout (3615 s) est contredit par celui du
++						 * 5 septembre (0 s, meme DTB) : ne pas le reutiliser.
 +						 *
 +						 * Cela reste utile ici parce que le NTP corrige en moins
 +						 * d'une minute, et que le correctif onedriver attend
-+						 * explicitement NTPSynchronized. Mais tout ce qui lit
-+						 * l'heure avant cela voit une valeur fausse.
++						 * explicitement NTPSynchronized.
 +						 *
 +						 * Remede quand l'ecart gene : redemarrer en EL1 et relire le
 +						 * dev_info du pilote pour recalculer la valeur.
