@@ -36,6 +36,32 @@ const zones = fs.readdirSync('/sys/class/thermal')
 
 const bootId = lire('/proc/sys/kernel/random/boot_id', 'inconnu');
 
+// Connexions RDP etablies, dans les deux sens. Ajoute le 2026-09-12 : FR observe que
+// les incidents tombent « quasiment a chaque fois » pendant une session KRDP avec le
+// mini-PC, et NI krdpserver NI le journal ne consignent les connexions — il n'existait
+// donc aucun historique a correler. On compte ici pour que le prochain incident porte
+// sa propre reponse, ET pour disposer du temoin negatif : combien de temps RDP est
+// connecte SANS que rien n'arrive. C'est ce controle qui a manque pour les erreurs
+// d'arret le 2026-09-11.
+//
+// /proc/net/tcp{,6} : champs 2 = local_address, 3 = rem_address, 4 = st.
+// Adresses en "HEX:PORT", etat 01 = ESTABLISHED. Port 3389 = 0x0D3D.
+const RDP_PORT = '0D3D';
+function rdp() {
+  let entrant = 0, sortant = 0;
+  for (const p of ['/proc/net/tcp', '/proc/net/tcp6']) {
+    const txt = lire(p, '');
+    if (!txt) continue;
+    for (const ligne of txt.split('\n').slice(1)) {
+      const c = ligne.trim().split(/\s+/);
+      if (c.length < 5 || c[3] !== '01') continue;   // ESTABLISHED seulement
+      if (c[1].endsWith(':' + RDP_PORT)) entrant++;  // on nous connecte (krdpserver)
+      if (c[2].endsWith(':' + RDP_PORT)) sortant++;  // on se connecte (freerdp)
+    }
+  }
+  return { entrant, sortant };
+}
+
 function echantillon(type) {
   let tmax = -Infinity, tnom = null;
   for (const z of zones) {
@@ -45,6 +71,7 @@ function echantillon(type) {
   const meminfo = lire('/proc/meminfo', '');
   const dispo = /MemAvailable:\s+(\d+)/.exec(meminfo);
   const uptime = lire('/proc/uptime', '0').split(' ')[0];
+  const r = rdp();
 
   return {
     t: new Date().toISOString(),
@@ -62,6 +89,8 @@ function echantillon(type) {
     cpu4_kHz: nombre('/sys/devices/system/cpu/cpu4/cpufreq/scaling_cur_freq'),
     load: Number(lire('/proc/loadavg', '0').split(' ')[0]),
     mem_dispo_kB: dispo ? Number(dispo[1]) : null,
+    rdp_in: r.entrant,                      // sessions KRDP entrantes etablies
+    rdp_out: r.sortant,                     // sessions freerdp sortantes etablies
   };
 }
 

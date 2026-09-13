@@ -63,6 +63,7 @@ limitations : **[`EL2-KVM.md`](EL2-KVM.md)**.
 | `scripts/` | sauvegarde, vérification d'artefacts, outils Windows (GPT, écriture disque) |
 | `systeme/` | `grub.cfg` de référence, config du noyau en cours, `modprobe.d`, outils de mesure dans `systeme/bin/` |
 | `tools/` | petits modules de lecture seule, pour aller voir ce que le noyau ne dit pas |
+| `systeme/nftables.d/` | règles de pare-feu ciblées, liées au cycle de vie du service qu’elles protègent |
 | `docs/` | journaux de portage, état des pilotes, guides |
 
 Points d'entrée : **[`kernel/RECETTE-REBUILD.md`](kernel/RECETTE-REBUILD.md)** pour
@@ -73,6 +74,10 @@ Enquêtes ouvertes : **[`kernel/PDC-X1E-CONTOURNEMENT.md`](kernel/PDC-X1E-CONTOU
 — un contournement matériel amont appliqué à tort à ce silicium, en plein dans le chemin
 des interruptions de réveil ; **[`systeme/PCIE-PHY-INTERMITTENT.md`](systeme/PCIE-PHY-INTERMITTENT.md)**
 — le PHY PCIe qui échoue un démarrage sur huit et emporte le WiFi avec lui.
+
+Expérimentation : **[`kernel/NOYAU-RUST.md`](kernel/NOYAU-RUST.md)** — bâtir un noyau
+`CONFIG_RUST=y` **à côté** de celui qui tourne, sans détruire l’arbre qui fabrique ses
+modules.
 
 ## Binaires propriétaires
 

@@ -1,0 +1,26 @@
+#!/usr/sbin/nft -f
+# N'exposer RustDesk que dans le tailnet.
+#
+# RustDesk en acces IP direct ecoute sur *:21118 — toutes interfaces, WiFi
+# comprise, sur une machine qui se deplace. Cette table ne touche QUE ces deux
+# ports : policy accept, deux regles, rien d'autre n'est filtre.
+#
+# L'exception "lo" est indispensable : le trafic emis par la machine vers sa
+# propre adresse entre par lo et non par tailscale0. Sans elle, RustDesk ne peut
+# plus se joindre lui-meme.
+#
+# ⚠️ Les compteurs sont la parce que le blocage cote WiFi n'a PAS pu etre
+# verifie depuis cette machine : une connexion locale vers sa propre adresse WiFi passe
+# aussi par lo. La regle est juste par construction, pas prouvee de bout en
+# bout. Un compteur qui monte = une tentative venue d'ailleurs, donc la preuve.
+#   sudo nft list table inet rustdesk-garde
+
+table inet rustdesk-garde
+delete table inet rustdesk-garde
+table inet rustdesk-garde {
+    chain input {
+        type filter hook input priority filter; policy accept;
+        tcp dport 21118 iifname != { "tailscale0", "lo" } counter drop
+        udp dport 21119 iifname != { "tailscale0", "lo" } counter drop
+    }
+}
