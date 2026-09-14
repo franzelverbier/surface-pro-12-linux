@@ -1,7 +1,7 @@
-From eb81dce25e1409ec33c49fc81e26b4516c2858c0 Mon Sep 17 00:00:00 2001
+From a39d415b91f5f089298af021cfc5f93d2feb5057 Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?Fran=C3=A7ois=20Roux?= <info@humanlearning.ch>
 Date: Mon, 14 Sep 2026 14:30:15 +0200
-Subject: [PATCH 13/13] rtc: Add the Surface Aggregator RTC driver and its SP12
+Subject: [PATCH] rtc: Add the Surface Aggregator RTC driver and its SP12
  registry node
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
@@ -24,10 +24,68 @@ answers the request.
 Assisted-by: Claude:claude-fable-5-1
 Signed-off-by: François Roux <info@humanlearning.ch>
 ---
- drivers/rtc/rtc-surface.c | 129 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 129 insertions(+)
+ .../surface/surface_aggregator_registry.c     |   7 +
+ drivers/rtc/Kconfig                           |   7 +
+ drivers/rtc/Makefile                          |   1 +
+ drivers/rtc/rtc-surface.c                     | 129 ++++++++++++++++++
+ 4 files changed, 144 insertions(+)
  create mode 100644 drivers/rtc/rtc-surface.c
 
+diff --git a/drivers/platform/surface/surface_aggregator_registry.c b/drivers/platform/surface/surface_aggregator_registry.c
+index 9b122203eff8..95376420154c 100644
+--- a/drivers/platform/surface/surface_aggregator_registry.c
++++ b/drivers/platform/surface/surface_aggregator_registry.c
+@@ -51,6 +51,12 @@ static const struct software_node ssam_node_hub_base = {
+ 	.parent = &ssam_node_root,
+ };
+ 
++/* RTC */
++static const struct software_node ssam_node_rtc = {
++	.name = "ssam:01:01:01:00:00",
++	.parent = &ssam_node_root,
++};
++
+ /* AC adapter. */
+ static const struct software_node ssam_node_bat_ac = {
+ 	.name = "ssam:01:02:01:01:01",
+@@ -423,6 +429,7 @@ static const struct software_node *ssam_node_group_sp11[] = {
+ /* Devices for Surface Pro 12" first edition (ARM/QCOM) */
+ static const struct software_node *ssam_node_group_sp12in[] = {
+ 	&ssam_node_root,
++	&ssam_node_rtc,
+ 	&ssam_node_hub_kip,
+ 	&ssam_node_tmp_sensors,
+ 	&ssam_node_hid_kip_keyboard,
+diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
+index 01def8231873..9580bc4bbb02 100644
+--- a/drivers/rtc/Kconfig
++++ b/drivers/rtc/Kconfig
+@@ -1425,6 +1425,13 @@ config RTC_DRV_NTXEC
+ 	  embedded controller found in certain e-book readers designed by the
+ 	  original design manufacturer Netronix.
+ 
++config RTC_DRV_SURFACE
++	tristate "Microsoft Surface Aggregator RTC"
++	depends on SURFACE_AGGREGATOR
++	depends on SURFACE_AGGREGATOR_BUS
++	help
++	  TODO
++
+ comment "on-CPU RTC drivers"
+ 
+ config RTC_DRV_ASM9260
+diff --git a/drivers/rtc/Makefile b/drivers/rtc/Makefile
+index 0347645b021f..34f2cacd017a 100644
+--- a/drivers/rtc/Makefile
++++ b/drivers/rtc/Makefile
+@@ -185,6 +185,7 @@ obj-$(CONFIG_RTC_DRV_SUN4V)	+= rtc-sun4v.o
+ obj-$(CONFIG_RTC_DRV_SUN6I)	+= rtc-sun6i.o
+ obj-$(CONFIG_RTC_DRV_SUNPLUS)	+= rtc-sunplus.o
+ obj-$(CONFIG_RTC_DRV_SUNXI)	+= rtc-sunxi.o
++obj-$(CONFIG_RTC_DRV_SURFACE)	+= rtc-surface.o
+ obj-$(CONFIG_RTC_DRV_TEGRA)	+= rtc-tegra.o
+ obj-$(CONFIG_RTC_DRV_TEST)	+= rtc-test.o
+ obj-$(CONFIG_RTC_DRV_TI_K3)	+= rtc-ti-k3.o
 diff --git a/drivers/rtc/rtc-surface.c b/drivers/rtc/rtc-surface.c
 new file mode 100644
 index 000000000000..f6c17c4e98d5
