@@ -1,0 +1,54 @@
+From 449d86e91550b5211881708cbb2b0ef9cb780daa Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Fran=C3=A7ois=20Roux?= <info@humanlearning.ch>
+Date: Mon, 14 Sep 2026 14:30:15 +0200
+Subject: [PATCH 12/13] wifi: ath12k: Do not count a vdev restart as a newly
+ started vdev
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+ath12k_mac_vdev_start_restart() increments ar->num_started_vdevs on every
+call, including the restart issued by a channel switch (CSA). With a single
+vdev the counter reaches 2 after a CSA while the firmware keeps sending one
+VDEV_STAT event, so num_vdev_recvd never equals num_started_vdevs,
+fw_stats_done never completes, and every later stats request ends with
+"time out while waiting for fw stats done".
+
+Observed on a Surface Pro 12in (WCN7850) on 2026-09-12: eight seconds after
+"CTRL-EVENT-CHANNEL-SWITCH freq=5180 ch_width=160 MHz" the message repeated
+3087 times over five hours and the link was unusable until a reboot.
+
+Root cause and fix are Baochen Qiang's, from the linux-wireless thread
+"ath12k: WCN7850 fw stats permanently wedge after CSA" (July 2026). Not yet
+in mainline as of 7.3-rc3; carried here until it lands.
+
+Assisted-by: Claude:claude-fable-5-1
+Signed-off-by: François Roux <info@humanlearning.ch>
+---
+ drivers/net/wireless/ath/ath12k/mac.c | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/net/wireless/ath/ath12k/mac.c b/drivers/net/wireless/ath/ath12k/mac.c
+index af354bef5c0d..ef0f87a579b2 100644
+--- a/drivers/net/wireless/ath/ath12k/mac.c
++++ b/drivers/net/wireless/ath/ath12k/mac.c
+@@ -11392,7 +11392,15 @@ ath12k_mac_vdev_start_restart(struct ath12k_link_vif *arvif,
+ 						   &arvif->reg_tpc_info);
+ 	}
+ 
+-	ar->num_started_vdevs++;
++	/*
++	 * SP12: a restart (channel switch, CSA) must not count as a new
++	 * started vdev, or fw_stats_done never completes afterwards and
++	 * every stats request times out ("time out while waiting for fw
++	 * stats done"). Root cause and fix from Baochen Qiang, linux-wireless,
++	 * July 2026 ("ath12k: WCN7850 fw stats permanently wedge after CSA").
++	 */
++	if (!restart)
++		ar->num_started_vdevs++;
+ 	ath12k_dbg(ab, ATH12K_DBG_MAC,  "vdev %pM started, vdev_id %d\n",
+ 		   ahvif->vif->addr, arvif->vdev_id);
+ 
+-- 
+2.55.0
+

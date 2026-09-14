@@ -1,0 +1,129 @@
+From e98bf5142bbbc74872345ef655cc22d4d93c0b34 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Fran=C3=A7ois=20Roux?= <info@humanlearning.ch>
+Date: Mon, 14 Sep 2026 14:30:15 +0200
+Subject: [PATCH 11/13] phy: qcom: qmp-pcie: Skip the no-csr reset when the PHY
+ is already up
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Backport of upstream 910b828b22b7 ("phy: qcom: qmp-pcie: Skip PHY reset if
+already up", Krishna Chaitanya Chundru, 2026-07-09, in 7.3-rc1): when the
+bootloader left the PHY started (skip_init) and PHYSTATUS already reports it
+up, do not assert and deassert the no-csr reset at all.
+
+On the Surface Pro 12in (X1P42100) the PCIe PHY 1c0e000.phy fails to come up
+on 16 of 135 boots ("phy initialization timed-out"), which loses the Wi-Fi
+card until the next reboot. Every successful boot shows skip_init=1, so the
+reset cycle applied on top of a bootloader-initialised PHY is the prime
+suspect. This carries the upstream change and extends the SP12 diagnostic
+line with the PHY status and the skip_reset decision, so a failing boot will
+say whether the PHY was up before we touched it.
+
+Not for upstream as is: the dev_info is diagnostic only.
+
+Assisted-by: Claude:claude-fable-5-1
+Signed-off-by: François Roux <info@humanlearning.ch>
+---
+ drivers/phy/qualcomm/phy-qcom-qmp-pcie.c | 54 +++++++++++++++++++-----
+ 1 file changed, 44 insertions(+), 10 deletions(-)
+
+diff --git a/drivers/phy/qualcomm/phy-qcom-qmp-pcie.c b/drivers/phy/qualcomm/phy-qcom-qmp-pcie.c
+index d3effad7a074..890d026842cd 100644
+--- a/drivers/phy/qualcomm/phy-qcom-qmp-pcie.c
++++ b/drivers/phy/qualcomm/phy-qcom-qmp-pcie.c
+@@ -4862,6 +4862,7 @@ static int qmp_pcie_init(struct phy *phy)
+ 	struct qmp_pcie *qmp = phy_get_drvdata(phy);
+ 	const struct qmp_phy_cfg *cfg = qmp->cfg;
+ 	void __iomem *pcs = qmp->pcs;
++	bool skip_reset;
+ 	int ret;
+ 
+ 	/*
+@@ -4877,6 +4878,32 @@ static int qmp_pcie_init(struct phy *phy)
+ 		qphy_checkbits(pcs, cfg->regs[QPHY_START_CTRL], SERDES_START | PCS_START) &&
+ 		qphy_checkbits(pcs, cfg->regs[QPHY_PCS_POWER_DOWN_CONTROL], cfg->pwrdn_ctrl);
+ 
++	/*
++	 * SP12 diagnostic, not for upstream. This PHY fails to initialise on
++	 * roughly one boot in eight (16 of 135 boots): "phy initialization
++	 * timed-out", the PCIe host then fails with -ETIMEDOUT and the Wi-Fi
++	 * card is never enumerated. The suspicion is that the bootloader leaves
++	 * the PHY with the started bits set but not actually working, so we take
++	 * the skip_init shortcut and then wait for a status that never comes.
++	 * Print the three terms on every boot so the failing ones can be told
++	 * apart from the rest. Remove once the question is settled.
++	 *
++	 * Backport of upstream 910b828b22b7 ("phy: qcom: qmp-pcie: Skip PHY
++	 * reset if already up", 2026-07-09): when skip_init is taken and the
++	 * PHY already reports itself up, do not cycle the no-csr reset at all.
++	 * phy_up is logged as the fourth term.
++	 */
++	skip_reset = qmp->skip_init && !qphy_checkbits(pcs, cfg->regs[QPHY_PCS_STATUS],
++							    cfg->phy_status);
++
++	dev_info(qmp->dev,
++		 "sp12: skip_init=%d (nocsr=%d start_ctrl=%d pwrdn=%d phy_up=%d) skip_reset=%d\n",
++		 qmp->skip_init, !!qmp->nocsr_reset,
++		 qphy_checkbits(pcs, cfg->regs[QPHY_START_CTRL], SERDES_START | PCS_START),
++		 qphy_checkbits(pcs, cfg->regs[QPHY_PCS_POWER_DOWN_CONTROL], cfg->pwrdn_ctrl),
++		 !qphy_checkbits(pcs, cfg->regs[QPHY_PCS_STATUS], cfg->phy_status),
++		 skip_reset);
++
+ 	if (!qmp->skip_init && !cfg->tbls.serdes_num) {
+ 		dev_err(qmp->dev, "Init sequence not available\n");
+ 		return -ENODATA;
+@@ -4900,13 +4927,15 @@ static int qmp_pcie_init(struct phy *phy)
+ 		}
+ 	}
+ 
+-	ret = reset_control_assert(qmp->nocsr_reset);
+-	if (ret) {
+-		dev_err(qmp->dev, "no-csr reset assert failed\n");
+-		goto err_assert_reset;
+-	}
++	if (!skip_reset) {
++		ret = reset_control_assert(qmp->nocsr_reset);
++		if (ret) {
++			dev_err(qmp->dev, "no-csr reset assert failed\n");
++			goto err_assert_reset;
++		}
+ 
+-	usleep_range(200, 300);
++		usleep_range(200, 300);
++	}
+ 
+ 	if (!qmp->skip_init) {
+ 		ret = reset_control_bulk_deassert(cfg->num_resets, qmp->resets);
+@@ -4956,8 +4985,11 @@ static int qmp_pcie_power_on(struct phy *phy)
+ 	void __iomem *pcs = qmp->pcs;
+ 	void __iomem *status;
+ 	unsigned int mask, val;
++	bool skip_reset;
+ 	int ret;
+ 
++	skip_reset = qmp->skip_init && !qphy_checkbits(pcs, cfg->regs[QPHY_PCS_STATUS],
++							    cfg->phy_status);
+ 	/*
+ 	 * Write CSR register for PHY that doesn't support no_csr reset or has not
+ 	 * been initialized.
+@@ -4981,10 +5013,12 @@ static int qmp_pcie_power_on(struct phy *phy)
+ 	if (ret)
+ 		return ret;
+ 
+-	ret = reset_control_deassert(qmp->nocsr_reset);
+-	if (ret) {
+-		dev_err(qmp->dev, "no-csr reset deassert failed\n");
+-		goto err_disable_pipe_clk;
++	if (!skip_reset) {
++		ret = reset_control_deassert(qmp->nocsr_reset);
++		if (ret) {
++			dev_err(qmp->dev, "no-csr reset deassert failed\n");
++			goto err_disable_pipe_clk;
++		}
+ 	}
+ 
+ 	if (qmp->skip_init)
+-- 
+2.55.0
+

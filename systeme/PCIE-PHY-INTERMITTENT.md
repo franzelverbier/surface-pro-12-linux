@@ -1,6 +1,7 @@
 # Le PHY PCIe échoue un démarrage sur huit, et il n'y a aucun rattrapage
 
-> État au 2026-09-11 : **diagnostic en place, cause non établie.**
+> État au 2026-09-14 : **diagnostic en place, correctif amont rétroporté (`patches/0011`),
+> effet à mesurer sur des semaines.** Voir la section finale.
 
 ## Le symptôme
 
@@ -136,6 +137,27 @@ Régénéré par `mkinitcpio -k 7.1.0-next-20260626-nft -g …`. L'analyse est i
 
 D'où le choix : **fichier séparé**, `/boot/initramfs-nft-diag.img`, utilisé par la seule
 entrée 5. `initramfs-nft.img` (entrée 0) et le secours figé restent intacts à l'octet.
+
+## Le correctif amont, rétroporté le 2026-09-14
+
+Mainline a touché exactement ce chemin après notre base : `910b828b22b7`, « phy: qcom:
+qmp-pcie: Skip PHY reset if already up » (Krishna Chaitanya Chundru, 09/07/2026, 7.3-rc1).
+Quand `skip_init` est pris **et** que `PHYSTATUS` dit déjà « up », le pilote n'assert ni
+ne deassert plus le reset no-csr. Le motif amont est le temps de démarrage ; pour nous,
+c'est le cycle de reset appliqué à un PHY déjà initialisé par le firmware qui devient le
+suspect principal, puisque tout démarrage réussi montre `skip_init=1`.
+
+Porté sur le module instrumenté (`patches/0011`), installé dans `/lib/modules/…-nft` et
+dans `initramfs-nft-diag.img` (entrée 5), sauvegardes `*.avant-audit-20260914`. La ligne
+de diagnostic devient :
+
+```
+sp12: skip_init=1 (nocsr=1 start_ctrl=1 pwrdn=1 phy_up=1) skip_reset=1
+```
+
+Sur un échec, `phy_up=0` dira que le PHY était déjà tombé avant qu'on le touche, et le
+correctif n'y peut rien ; `phy_up=1` suivi malgré tout d'un timeout dira que la cause est
+ailleurs. Base de comparaison : 16 échecs sur 135 démarrages.
 
 ## Pistes non explorées
 

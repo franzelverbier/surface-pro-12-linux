@@ -407,6 +407,11 @@ machine, une partie de `/lib/modules` provient d'un arbre qui n'existe plus.
 
 ### Et le pire : `updates/`, que la configuration ne décrit pas
 
+> **Depuis le 2026-09-14, l'arbre `-nft` a lui aussi un `updates/`**, avec un seul
+> fichier, posé exprès : `surface_aggregator_registry.ko` bâti avec le nœud RTC du SAM
+> (`patches/0013`). Il prime sur la copie de `kernel/`, qui reste intacte ; le retirer
+> puis `depmod -a` revient à l'état d'avant. Voir `docs/AUDIT-2026-09-14.md`.
+
 Les deux modules ci-dessus étaient inoffensifs. Le répertoire `updates/` — qui **prime sur
 `kernel/`** dans l'ordre de recherche de `modprobe` — en contenait un qui, lui, portait une
 fonction réelle :

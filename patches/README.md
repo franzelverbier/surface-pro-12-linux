@@ -10,6 +10,10 @@ d'origine ; voir le README racine pour la licence.
 | `0007` | panneau eDP Sharp LQ120P1JX51 — ✅ **accepté en amont**, `drm-misc-next` | ce dépôt |
 | `0008` | RTC : décalage d'époque statique par device tree, pour EL2 où les variables EFI sont perdues | ce dépôt |
 | `0009` | ASoC qdsp6 : échec rapide de la sonde de disponibilité de l'ADSP — 1,5 s de démarrage | ce dépôt |
+| `0010` | remoteproc : recovery désactivée quand il n'y a pas de `.start` | ce dépôt |
+| `0011` | PHY PCIe : ne pas cycler le reset no-csr si le PHY est déjà up — rétroportage de `910b828b22b7` (7.3), pour le WiFi absent un démarrage sur huit | amont, porté ici |
+| `0012` | ath12k : un restart (CSA) ne compte pas comme un vdev démarré — le WiFi figé sur `fw stats done` du 12/09 | Baochen Qiang (linux-wireless), porté ici |
+| `0013` | RTC lu par le SAM (`rtc-surface.c`) + nœud de registre `01:01:01:00:00` — une horloge en EL2 sans variables EFI | Maximilian Luz, via l'overlay Gentoo miasvanklei |
 | `serie-complete/` | **les 16 patchs** séparant le noyau de référence de `next-20260626` — source correspondante complète | mixte, paternité préservée |
 | `audio-el2-serie.md` | notes sur la série remoteproc « attach » : mécanisme, pièges, avertissement ABI | Stephan Gerhold (miroir) |
 | `registry-next20260626.c` | table de registre SAM | Harrison van der Byl |
@@ -362,3 +366,27 @@ il renvoie `enabled`.
 `qcom_q6v5_pas.ko.avant-recovery-20260904`. **Non rechargé à chaud** : décharger le module
 appellerait `.stop` sur des DSP attachés par le firmware, sans garantie de rattachement.
 
+
+## `0011` à `0013` — l'audit du 2026-09-14
+
+Voir `docs/AUDIT-2026-09-14.md` pour le contexte, l'état d'installation et les tests à
+faire au redémarrage. En bref :
+
+- **`0011`** rétroporte `910b828b22b7` (« phy: qcom: qmp-pcie: Skip PHY reset if already
+  up », 7.3-rc1) sur le module déjà instrumenté : quand `skip_init` est pris et que
+  `PHYSTATUS` dit déjà « up », le reset no-csr n'est plus ni posé ni levé. La ligne de
+  diagnostic gagne `phy_up=` et `skip_reset=`. C'est le chemin exact de la panne
+  « un démarrage sur huit » ; l'effet reste à mesurer sur des semaines.
+- **`0012`** est le correctif d'une ligne de Baochen Qiang : `num_started_vdevs` n'est
+  plus incrémenté sur un restart, sans quoi `fw_stats_done` ne se termine jamais après un
+  changement de canal. Pas encore en mainline au 14/09.
+- **`0013`** ajoute `rtc-surface.c` (SAM, commandes `0x10`/`0x0f`) et le nœud
+  `ssam:01:01:01:00:00` au groupe `sp12in`. Le registre est installé dans `updates/`,
+  le pilote RTC est mis de côté hors depmod tant que le SAM n'a pas répondu une fois.
+
+⚠️ **Correction du 14/09 sur la section « Ces patchs sont périmés »** : mainline
+(7.3-rc3) a fusionné le DTS sous le nom `x1p42100-microsoft-sp12in.dts` avec le
+compatible **`microsoft,surface-pro-12in`**, inchangé. Le renommage en `microsoft,sp12`
+n'a pas eu lieu, et `ssam_node_group_sp12` n'existe pas dans le registre amont : le
+groupe qui fait autorité est bien `ssam_node_group_sp12in`. Ce que dit la section sur
+`x1p42100-microsoft-sp12-el2.dtb` n'a pas été revérifié.

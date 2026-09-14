@@ -21,7 +21,7 @@ Windows de votre propre machine (voir [Binaires propriétaires](#binaires-propri
 | Décodage vidéo matériel (iris) | ✅ en EL1 · ❌ **en EL2** — `iris` est mis à `disabled` dans le DTS EL2, il ne survit pas à la bascule. Aucun `/dev/video*` |
 | Caméras | ❌ |
 | TPM | ❌ non exposé à Linux |
-| Veille / reprise | ❌ — `sleep.target` et `suspend.target` sont masqués. Snapdragon ne reprend pas ; masquer évite un gel au rabat de l'écran |
+| Veille / reprise | ❌ — `sleep.target` et `suspend.target` sont masqués. Snapdragon ne reprend pas ; masquer évite un gel au rabat de l'écran. Test s2idle préparé (entrée GRUB 7, voir `docs/AUDIT-2026-09-14.md`) : un rapport tiers dit que la reprise marche tant que le domaine capteurs de l'ADSP n'a pas été attaché |
 | **EL2 + KVM** | ✅ voir ci-dessous |
 
 ### EL2 et KVM
