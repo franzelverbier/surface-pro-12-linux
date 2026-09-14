@@ -44,6 +44,13 @@ démarrage, d'où le chargement tardif avec réessai.
 d'attente entrent dans la transaction de démarrage et gonflent le temps rapporté par
 `systemd-analyze` sans rien retarder de réel.
 
+**`sp12-rtc-sam.service`** + `udev/91-sp12-rtc-sam.rules` + `bin/sp12-rtc-sam.js` — depuis le
+2026-09-14, l'horloge système en EL2 vient du RTC du Surface Aggregator (`rtc-surface`,
+`patches/0013`) : la règle udev en fait `/dev/rtc` devant le pm8xxx, `systemd-timesyncd`
+y réécrit l'heure NTP, et le service pose l'heure du SAM au démarrage si NTP n'a pas
+encore parlé, en refusant de reculer avant le dernier arrêt connu. Voir
+`docs/AUDIT-2026-09-14.md` §6.
+
 **`sp12-temoin.service`** — relevé périodique `fsync`'é, dans
 `/data/sp12data/temoin/temoin.jsonl`. Ajouté le 2026-08-27 après deux redémarrages
 spontanés sans aucune trace (26 août 20:43:54, 27 août 08:38:34).

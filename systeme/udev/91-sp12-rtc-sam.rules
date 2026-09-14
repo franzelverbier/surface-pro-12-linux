@@ -1,0 +1,5 @@
+# SP12 — le RTC du Surface Aggregator (rtc-surface, patches/0013) devient /dev/rtc,
+# devant rtc0 (rtc-pm8xxx, décalage d'époque inconnu en EL2). systemd-timesyncd
+# écrit l'heure NTP dans /dev/rtc : le SAM reste donc à l'heure d'un boot à l'autre.
+# Et au démarrage, avant NTP, sp12-rtc-sam.service pose l'heure du SAM (avec garde-fou).
+SUBSYSTEM=="rtc", ATTR{name}=="surface_rtc*", SYMLINK+="rtc", OPTIONS+="link_priority=10", TAG+="systemd", ENV{SYSTEMD_WANTS}+="sp12-rtc-sam.service"

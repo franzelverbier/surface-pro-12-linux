@@ -1,0 +1,10 @@
+[Unit]
+Description=SP12 - Heure système depuis le RTC du Surface Aggregator (EL2 sans variables EFI)
+Documentation=file:/data/git/surface-pro-12-linux/docs/AUDIT-2026-09-14.md
+# Déclenché par udev (91-sp12-rtc-sam.rules) quand rtc-surface s'enregistre.
+DefaultDependencies=no
+After=systemd-timesyncd.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/sp12-rtc-sam.js
