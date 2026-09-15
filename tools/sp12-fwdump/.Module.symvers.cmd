@@ -1,0 +1,1 @@
+savedcmd_Module.symvers :=  /home/franz/sp12-kernel-rebuild/linux-next/scripts/mod/modpost -M          -o Module.symvers -n -T modules.order -i /home/franz/sp12-kernel-rebuild/linux-next/Module.symvers -e 

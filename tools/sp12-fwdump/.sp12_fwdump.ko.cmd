@@ -1,0 +1,1 @@
+savedcmd_sp12_fwdump.ko := ld -r -EL  -maarch64elf -z noexecstack --no-warn-rwx-segments --build-id=sha1  -T /home/franz/sp12-kernel-rebuild/linux-next/scripts/module.lds -o sp12_fwdump.ko sp12_fwdump.o sp12_fwdump.mod.o .module-common.o
