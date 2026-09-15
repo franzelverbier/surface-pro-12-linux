@@ -1,0 +1,19 @@
+[Unit]
+Description=SP12 - Redemarrage automatique des entrees GRUB de test (machine sans clavier)
+Documentation=file:/data/git/surface-pro-12-linux/docs/AUDIT-2026-09-14.md
+# Ne se declenche QUE si la ligne de commande porte ce marqueur. L'entree d'usage
+# courant ne le porte pas, donc ce service ne peut pas redemarrer une session de
+# travail ordinaire.
+ConditionKernelCommandLine=sp12.autoreboot
+# Ordonne APRES la cible qui le veut : celle-ci ne l'attend donc pas et le
+# demarrage n'est pas rallonge (meme motif que les drop-ins 10-nonblocking).
+After=multi-user.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/bin/sp12-autoreboot.js
+TimeoutStartSec=infinity
+
+[Install]
+WantedBy=multi-user.target
