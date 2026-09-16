@@ -24,6 +24,7 @@ const SRC = process.argv[2] || '/data/linux-7.3/arch/arm64/boot/dts/qcom';
 const SORTIE = process.argv[3] || 'cameras.dtso';
 const HAMOA = path.join(SRC, 'hamoa.dtsi');
 const CARTE = path.join(SRC, 'x1p42100-microsoft-sp12in.dts');
+const PURWA = path.join(SRC, 'purwa.dtsi');
 
 const cache = new Map();
 const lire = f => { if (!cache.has(f)) cache.set(f, fs.readFileSync(f, 'utf8').split('\n')); return cache.get(f); };
@@ -42,11 +43,27 @@ function bloc(fichier, motif, nom) {
   return L.slice(i, j);
 }
 
+// Retire des sous-blocs étiquetés d'un bloc déjà découpé, par appariement
+// d'accolades. Sert à enlever csiphy1 et csiphy2, que purwa.dtsi supprime
+// parce que le x1p42100 ne les a pas — hamoa.dtsi décrit le x1e80100 entier.
+function retirerSousBlocs(lignes, labels) {
+  let L = lignes.slice();
+  for (const lab of labels) {
+    const i = L.findIndex(l => l.includes(lab + ': '));
+    if (i < 0) { console.error(`❌ sous-bloc ${lab} introuvable`); process.exit(1); }
+    let p = 0, j = i;
+    do { p += (L[j].match(/\{/g) || []).length - (L[j].match(/\}/g) || []).length; j++; } while (p > 0 && j < L.length);
+    console.error(`   - ${lab} retiré (${j - i} lignes)`);
+    L = [...L.slice(0, i), ...L.slice(j)];
+  }
+  return L;
+}
+
 // Les #include de macros des deux sources (on écarte les inclusions de .dtsi,
 // qui tireraient tout le SoC dans l'overlay).
 function includes() {
   const vus = new Set();
-  for (const f of [HAMOA, CARTE])
+  for (const f of [HAMOA, PURWA, CARTE])
     for (const l of lire(f))
       if (/^#include\s+</.test(l)) vus.add(l.trim());
   return [...vus].sort();
@@ -64,7 +81,8 @@ const reg8 = bloc(CARTE, '^\\tregulators-8 \\{', 'banc pm8010 (reg. 8)');
 const socBlocs = [
   ['cci0', bloc(HAMOA, '^\\t\\tcci0: cci@ac15000 \\{', 'cci0')],
   ['cci1', bloc(HAMOA, '^\\t\\tcci1: cci@ac16000 \\{', 'cci1')],
-  ['camss + csiphy0 + csiphy4', bloc(HAMOA, '^\\t\\tcamss: isp@acb7000 \\{', 'camss (+csiphy)')],
+  ['camss + csiphy0 + csiphy4', retirerSousBlocs(
+      bloc(HAMOA, '^\\t\\tcamss: isp@acb7000 \\{', 'camss (+csiphy)'), ['csiphy1', 'csiphy2'])],
 ];
 
 // 3. Les états pinctrl : ceux du SoC et ceux de la carte.
@@ -106,6 +124,14 @@ out.push('');
 out.push('&soc {');
 for (const [titre, b] of socBlocs) ajouter(titre, b);
 out.push('};');
+out.push('');
+// hamoa.dtsi décrit le x1e80100 complet : DEUX IFE. Le x1p42100 n'en a qu'un.
+// Sans cette redéfinition, camss réclame un domaine d'alimentation « ife1 »
+// qui n'existe pas, reporte sa sonde en -517, puis plante dans son propre
+// chemin de nettoyage — et ce plantage a lieu dans le fil des sondes
+// reportées, ce qui emporte tout le reste, carte son comprise.
+out.push('', '/* x1p42100 (Purwa) : un seul IFE, autres horloges, autres IOMMU */');
+out.push(...bloc(PURWA, '^&camss \\{', '&camss (purwa, x1p42100)'));
 out.push('');
 out.push('&tlmm {');
 for (const [titre, b] of pinBlocs) ajouter(titre, b);
