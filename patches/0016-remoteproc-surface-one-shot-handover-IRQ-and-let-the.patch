@@ -1,0 +1,194 @@
+From f023d2fa08f8cdbd3a2985be355d8647ac367bae Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Fran=C3=A7ois=20Roux?= <info@humanlearning.ch>
+Date: Wed, 16 Sep 2026 15:40:49 +0200
+Subject: [PATCH] remoteproc/surface: one-shot handover IRQ, and let the EC
+ keep its handle in D3
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Two upstream-sourced fixes for symptoms this machine actually shows.
+
+1. remoteproc: qcom: q6v5: Make handover IRQ one-shot — mainline bb7c5d6f5b41
+   (Abel Vesa, 2026-06-12), absent from our next-20260626 base and backported on
+   purpose by CyberMyth OS. Without it the handover interrupt stays enabled after
+   the first event and the driver logs every duplicate. Observed here: four
+   "Handover signaled, but it already happened" and two CDSP crashes.
+
+   ⚠️ Adapted, not applied as is. Five of six hunks land; the sixth targets
+   qcom_q6v5_prepare(), which the out-of-tree attach series merged with the
+   attach path into q6v5_init(). The conversion was done there instead — both
+   callers pass through it — and the two helpers were moved above their first
+   use. The added handover_irq_enabled field and its spinlock grow
+   struct qcom_q6v5, so qcom_q6v5, qcom_q6v5_pas, qcom_q6v5_adsp and
+   qcom_q6v5_mss were all rebuilt and installed together: with MODVERSIONS off,
+   a mismatched pair writes past the allocated structure in silence.
+
+2. platform/surface: aggregator: caps->d3_closes_handle = false on the device
+   tree path. Mias van Klei's workaround, carried by both his Gentoo overlay and
+   CyberMyth. Enabling it breaks suspend on this hardware, and suspend has never
+   been tested here with it disabled.
+
+Assisted-by: Claude:claude-opus-5
+Signed-off-by: François Roux <info@humanlearning.ch>
+---
+ .../platform/surface/aggregator/controller.c  |  2 +-
+ drivers/remoteproc/qcom_q6v5.c                | 60 +++++++++++++++----
+ drivers/remoteproc/qcom_q6v5.h                |  4 ++
+ 3 files changed, 55 insertions(+), 11 deletions(-)
+
+diff --git a/drivers/platform/surface/aggregator/controller.c b/drivers/platform/surface/aggregator/controller.c
+index 6a8430cb9cbf..507fb9222818 100644
+--- a/drivers/platform/surface/aggregator/controller.c
++++ b/drivers/platform/surface/aggregator/controller.c
+@@ -1155,7 +1155,7 @@ static int ssam_controller_caps_load_from_of(struct device *dev, struct ssam_con
+ 	 * Every device starting with Surface Pro X through Laptop 7 uses these
+ 	 * identical values, which makes them good defaults.
+ 	 */
+-	caps->d3_closes_handle = true;
++	caps->d3_closes_handle = false;
+ 	caps->screen_on_sleep_idle_timeout = 5000;
+ 	caps->screen_off_sleep_idle_timeout = 30;
+ 	caps->ssh_buffer_size = 48;
+diff --git a/drivers/remoteproc/qcom_q6v5.c b/drivers/remoteproc/qcom_q6v5.c
+index ed1b578a831d..c7e64b135676 100644
+--- a/drivers/remoteproc/qcom_q6v5.c
++++ b/drivers/remoteproc/qcom_q6v5.c
+@@ -36,6 +36,40 @@ static int q6v5_load_state_toggle(struct qcom_q6v5 *q6v5, bool enable)
+ 	return ret;
+ }
+ 
++static void q6v5_handover_irq_enable(struct qcom_q6v5 *q6v5)
++{
++	unsigned long flags;
++	bool enable = false;
++
++	spin_lock_irqsave(&q6v5->handover_lock, flags);
++	if (!q6v5->handover_irq_enabled) {
++		q6v5->handover_irq_enabled = true;
++		enable = true;
++	}
++	spin_unlock_irqrestore(&q6v5->handover_lock, flags);
++
++	if (enable)
++		enable_irq(q6v5->handover_irq);
++}
++
++static void q6v5_handover_irq_disable(struct qcom_q6v5 *q6v5, bool sync)
++{
++	unsigned long flags;
++	bool disable = false;
++
++	spin_lock_irqsave(&q6v5->handover_lock, flags);
++	if (q6v5->handover_irq_enabled) {
++		q6v5->handover_irq_enabled = false;
++		disable = true;
++	}
++	spin_unlock_irqrestore(&q6v5->handover_lock, flags);
++
++	if (disable)
++		disable_irq_nosync(q6v5->handover_irq);
++	if (sync)
++		synchronize_irq(q6v5->handover_irq);
++}
++
+ static int q6v5_init(struct qcom_q6v5 *q6v5, bool handover_issued)
+ {
+ 	int ret;
+@@ -51,7 +85,13 @@ static int q6v5_init(struct qcom_q6v5 *q6v5, bool handover_issued)
+ 	q6v5->running = true;
+ 	q6v5->handover_issued = handover_issued;
+ 
+-	enable_irq(q6v5->handover_irq);
++	/*
++	 * Amont convertit cet appel dans qcom_q6v5_prepare(). Ici la serie
++	 * « attach » hors arbre a fusionne prepare() et attach() dans
++	 * q6v5_init(), donc la conversion se fait au meme endroit logique :
++	 * les deux chemins passent par ici, et l aide reste idempotente.
++	 */
++	q6v5_handover_irq_enable(q6v5);
+ 	return 0;
+ }
+ 
+@@ -108,7 +148,8 @@ EXPORT_SYMBOL_GPL(qcom_q6v5_attach);
+  */
+ int qcom_q6v5_unprepare(struct qcom_q6v5 *q6v5)
+ {
+-	disable_irq(q6v5->handover_irq);
++	q6v5_handover_irq_disable(q6v5, true);
++
+ 	q6v5_load_state_toggle(q6v5, false);
+ 
+ 	/* Disable interconnect vote, in case handover never happened */
+@@ -194,18 +235,15 @@ static irqreturn_t q6v5_handover_interrupt(int irq, void *data)
+ {
+ 	struct qcom_q6v5 *q6v5 = data;
+ 
+-	if (q6v5->handover_issued) {
+-		dev_err(q6v5->dev, "Handover signaled, but it already happened\n");
+-		return IRQ_HANDLED;
+-	}
++	q6v5->handover_issued = true;
++
++	q6v5_handover_irq_disable(q6v5, false);
+ 
+ 	if (q6v5->handover)
+ 		q6v5->handover(q6v5);
+ 
+ 	icc_set_bw(q6v5->path, 0, 0);
+ 
+-	q6v5->handover_issued = true;
+-
+ 	return IRQ_HANDLED;
+ }
+ 
+@@ -315,6 +353,8 @@ int qcom_q6v5_init(struct qcom_q6v5 *q6v5, struct platform_device *pdev,
+ 	q6v5->crash_reason = crash_reason;
+ 	q6v5->handover = handover;
+ 
++	spin_lock_init(&q6v5->handover_lock);
++
+ 	init_completion(&q6v5->start_done);
+ 	init_completion(&q6v5->stop_done);
+ 
+@@ -363,13 +403,13 @@ int qcom_q6v5_init(struct qcom_q6v5 *q6v5, struct platform_device *pdev,
+ 
+ 	ret = devm_request_threaded_irq(&pdev->dev, q6v5->handover_irq,
+ 					NULL, q6v5_handover_interrupt,
+-					IRQF_TRIGGER_RISING | IRQF_ONESHOT,
++					IRQF_TRIGGER_RISING | IRQF_ONESHOT |
++					IRQF_NO_AUTOEN,
+ 					"q6v5 handover", q6v5);
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "failed to acquire handover IRQ\n");
+ 		return ret;
+ 	}
+-	disable_irq(q6v5->handover_irq);
+ 
+ 	q6v5->stop_irq = platform_get_irq_byname(pdev, "stop-ack");
+ 	if (q6v5->stop_irq < 0)
+diff --git a/drivers/remoteproc/qcom_q6v5.h b/drivers/remoteproc/qcom_q6v5.h
+index f034bb628605..ca661174332c 100644
+--- a/drivers/remoteproc/qcom_q6v5.h
++++ b/drivers/remoteproc/qcom_q6v5.h
+@@ -5,6 +5,7 @@
+ 
+ #include <linux/kernel.h>
+ #include <linux/completion.h>
++#include <linux/spinlock.h>
+ #include <linux/soc/qcom/qcom_aoss.h>
+ 
+ struct icc_path;
+@@ -29,6 +30,9 @@ struct qcom_q6v5 {
+ 	int handover_irq;
+ 	int stop_irq;
+ 
++	/* Protects handover_irq_enabled against stop/handover races. */
++	spinlock_t handover_lock;
++	bool handover_irq_enabled;
+ 	bool handover_issued;
+ 
+ 	struct completion start_done;
+-- 
+2.55.0
+
