@@ -46,10 +46,29 @@ const versCameras = corps => corps.map(l => l.startsWith('    devicetree ')
 const garder = [
   [null, null, '═══ AU QUOTIDIEN ═══'],
 
+  ['courant', 'el2-cam',
+   "SP12 — usage courant + caméras  (EL2 + KVM + son)  ← DÉFAUT",
+   ["Tout à la fois. Le DTB de juin, celui qui",
+    "démarre en EL2 depuis le 11/09, avec les caméras GREFFÉES par overlay :",
+    "cci0, cci1, camss, csiphy0, csiphy4, les deux capteurs, leurs états",
+    "pinctrl — et le banc de régulateurs 8 (PMIC pm8010), qui manquait et qui",
+    "alimente 7 des 11 rails des capteurs.",
+    "",
+    "Fabriqué par systeme/bin/greffer-cameras.js ; source dans dts/cameras-greffe.dtso.",
+    "Contrôlé : 0 ligne supprimée, 615 ajoutées, aucune référence pendante, et",
+    "les phandles résolus pointent bien sur camcc, apps_smmu et tlmm de CE DTB.",
+    "",
+    "⚠️ Piège payé le 16/09 : camss avait d'abord été pris dans hamoa.dtsi, qui",
+    "décrit le x1e80100 avec DEUX IFE. Le x1p42100 n'en a qu'un. camss reportait",
+    "sa sonde puis plantait dans son nettoyage — dans le fil des sondes reportées,",
+    "ce qui emportait aussi la carte son. purwa.dtsi redéfinit &camss : la chaîne",
+    "est hamoa -> purwa -> carte, et s'arrêter en chemin donne une version périmée."],
+   versCameras],
   ['courant', 'courant',
-   "SP12 — usage courant  (EL2 + KVM, audio, réseau)",
-   ["Le quotidien depuis le 11/09, et le DÉFAUT. DTB de juin : pas de caméras,",
-    "mais EL2, KVM, audio et réseau. C'est le repli sûr si un essai échoue."]],
+   "SP12 — usage courant, sans caméras  (EL2 + KVM, audio, réseau)",
+   ["Le quotidien du 11/09 au 16/09. Même DTB de juin que le défaut, mais SANS la",
+    "greffe caméra. Repli sûr : si quelque chose cloche avec les caméras, c'est ici",
+    "qu'on revient, et cette entrée n'a pas bougé d'un octet depuis le 11/09."]],
 
   ['amont-el1-nft', 'amont-el1-nft',
    "SP12 — DTS amont : caméras + audio + RTC  (EL1, démarrage lent)",
@@ -63,25 +82,9 @@ const garder = [
     "caméras marchent (l'arrière sort en 4216x3136). En revanche le DSP est sur",
     "liste noire — aucune carte son — et /dev/rtc retombe sur le pm8xxx qui dérive."]],
 
-  [null, null, '═══ L\'ESSAI EN COURS : faire cohabiter EL2 et le device tree amont ═══'],
-  ['courant', 'el2-cam',
-   "SP12 — ★ PROCHAIN ESSAI : usage courant + LES CAMÉRAS  (EL2 + KVM + son)",
-   ["Tout à la fois, sans changer de device tree. Le DTB de juin, celui qui",
-    "démarre en EL2 depuis le 11/09, avec les caméras GREFFÉES par overlay :",
-    "cci0, cci1, camss, csiphy0, csiphy4, les deux capteurs, leurs états",
-    "pinctrl — et le banc de régulateurs 8 (PMIC pm8010), qui manquait et qui",
-    "alimente 7 des 11 rails des capteurs.",
-    "",
-    "Fabriqué par systeme/bin/greffer-cameras.js ; source dans dts/cameras-greffe.dtso.",
-    "Contrôlé : 0 ligne supprimée, 615 ajoutées, aucune référence pendante, et",
-    "les phandles résolus pointent bien sur camcc, apps_smmu et tlmm de CE DTB.",
-    "",
-    "Démarre  → caméras + KVM + son, et le device tree amont devient inutile.",
-    "Replante → c'est camss en EL2 qui ne passe pas, pas le device tree amont.",
-    "           Maintenir le bouton marche ; le défaut ramène sur l'entrée 1."],
-   versCameras],
+  [null, null, '═══ LE DEVICE TREE AMONT : toujours refusé par la bascule EL2 ═══'],
   ['amont-el2-nocam', 'amont-el2-nocam',
-   "SP12 — ★ PROCHAIN ESSAI : DTS amont + EL2, sans les caméras",
+   "SP12 — DTS amont + EL2, sans les caméras  (échoue aussi)",
    ["Acquis : DTB amont en EL1 démarre (entrée 2), DTB de juin en EL2 démarre",
     "(entrée 1), DTB amont en EL2 donne un écran noir. C'est donc la BASCULE EL2",
     "qui refuse quelque chose du device tree amont. CoreSight a déjà été écarté.",
@@ -139,6 +142,12 @@ const entete = `# Surface Pro 12 (x1p42100) — menu de démarrage
 # noyaux, initramfs et DTB correspondants sont toujours dans /boot.
 # RIEN N'A ÉTÉ SUPPRIMÉ DU DISQUE : remettre une entrée = recopier son bloc.
 #
+# DÉFAUT DEPUIS LE 16/09/2026 : el2-cam. Elle fait tout ce que faisait « courant »
+# (EL2, KVM, audio, réseau) et y ajoute les deux caméras, greffées par overlay sur le
+# même DTB de juin. Vérifié au démarrage de 17:49 : /dev/kvm, une carte son, 12 nœuds
+# video, CMA 524288 kB, zéro oops, capture 4216x3136 à 30 img/s sans sudo.
+# En cas de doute, « usage courant » reste intacte, juste en dessous.
+#
 # ⚠️ LE DÉFAUT EST DÉSIGNÉ PAR IDENTIFIANT, PAS PAR NUMÉRO. Ajouter ou retirer
 # une entrée ne peut donc pas changer ce qui démarre. GRUB compte à partir de 0
 # et le menu se lit à partir de 1 : le 15/09, cette ambiguïté a failli coûter
@@ -158,13 +167,13 @@ const entete = `# Surface Pro 12 (x1p42100) — menu de démarrage
 # qui les utilise doit porter modprobe.blacklist=qcom_q6v5_pas.
 
 set timeout=5
-set default=courant
+set default=el2-cam
 
 # Police agrandie — l'écran fait 2196 px de large et la police par défaut de
 # GRUB y est minuscule. TOUT EST CONDITIONNEL : si l'image GRUB n'a pas ces
 # modules ou si le fichier manque, le menu s'affiche exactement comme avant.
 # Et même si l'affichage échouait complètement, le délai de 5 s démarre de
-# toute façon l'entrée « courant » : cette machine ne peut pas rester bloquée
+# toute façon l'entrée « el2-cam » : cette machine ne peut pas rester bloquée
 # sur un menu invisible.
 if search --no-floppy --set=fontroot --label SP12ROOT-INT ; then
     if loadfont ($fontroot)/boot/grub/fonts/sp12-36.pf2 ; then
