@@ -91,6 +91,13 @@ function echantillon(type) {
     mem_dispo_kB: dispo ? Number(dispo[1]) : null,
     rdp_in: r.entrant,                      // sessions KRDP entrantes etablies
     rdp_out: r.sortant,                     // sessions freerdp sortantes etablies
+    // Retroeclairage. Ajoute le 2026-09-16 apres un ecran qui n est jamais revenu
+    // d une attenuation : le systeme tournait, seul l affichage etait noir, et rien
+    // n enregistrait la luminosite. bl = valeur brute, bl_pct = pourcentage du max,
+    // bl_power = 0 allume / 1..4 eteint par DPMS.
+    bl: nombre("/sys/class/backlight/backlight/brightness"),
+    bl_pct: (() => { const v=nombre("/sys/class/backlight/backlight/brightness"), m=nombre("/sys/class/backlight/backlight/max_brightness"); return (v!==null&&m) ? Math.round(v*100/m) : null; })(),
+    bl_power: nombre("/sys/class/backlight/backlight/bl_power"),
   };
 }
 
