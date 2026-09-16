@@ -1,0 +1,17 @@
+# /dev/dma_heap/* nait en crw------- root:root, donc libcamera ne tourne qu'en
+# root. Meme mecanisme que pour /dev/video* et /dev/media* : uaccess fait poser
+# par logind une liste de controle d'acces au profit de l'utilisateur de la
+# session active. Le groupe video sert de repli pour les services systeme.
+#
+# ATTENTION AU NUMERO. Le fichier doit etre lu AVANT 73-seat-late.rules, qui
+# porte la ligne :
+#     TAG=="uaccess", ENV{MAJOR}!="", RUN{builtin}+="uaccess"
+# Un tag pose en 92 arrive apres ce test : il est bien inscrit dans la base udev
+# (/run/udev/data/c250:1 montre « G:uaccess »), mais le builtin n'a jamais tourne
+# et aucune ACL n'est posee. Symptome cote utilisateur : la capture marche mais
+# libcamera annonce « Could not open any dma-buf provider » puis
+# « disabling software debayering », et on ne recupere que du Bayer brut.
+# Contrairement a /dev/video*, ces noeuds ne portent pas le tag « seat » (ils
+# sont virtuels, hors hierarchie de siege) ; le builtin uaccess retombe sur
+# seat0 par defaut, ce qui suffit.
+SUBSYSTEM=="dma_heap", GROUP="video", MODE="0660", TAG+="uaccess"
