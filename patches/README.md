@@ -14,6 +14,7 @@ d'origine ; voir le README racine pour la licence.
 | `0011` | PHY PCIe : ne pas cycler le reset no-csr si le PHY est déjà up — rétroportage de `910b828b22b7` (7.3), pour le WiFi absent un démarrage sur huit | amont, porté ici |
 | `0012` | ath12k : un restart (CSA) ne compte pas comme un vdev démarré — le WiFi figé sur `fw stats done` du 12/09 | Baochen Qiang (linux-wireless), porté ici |
 | `0013` | RTC lu par le SAM (`rtc-surface.c`) + nœud de registre `01:01:01:00:00` — ✅ **validé le 14/09** : `/dev/rtc` est désormais le SAM, voir `docs/AUDIT-2026-09-14.md` §6 | Maximilian Luz, via l'overlay Gentoo miasvanklei |
+| `0014` | caméras : PHY MIPI CSI-2, CAMSS x1p42100, capteurs ov13858 et ov02c10 — moitié pilote seulement, le device tree reste à greffer | Mias van Klei, via CyberMyth OS |
 | `serie-complete/` | **les 16 patchs** séparant le noyau de référence de `next-20260626` — source correspondante complète | mixte, paternité préservée |
 | `audio-el2-serie.md` | notes sur la série remoteproc « attach » : mécanisme, pièges, avertissement ABI | Stephan Gerhold (miroir) |
 | `registry-next20260626.c` | table de registre SAM | Harrison van der Byl |
