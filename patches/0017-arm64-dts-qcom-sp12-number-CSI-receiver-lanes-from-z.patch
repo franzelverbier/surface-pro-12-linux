@@ -1,0 +1,66 @@
+From dc84deece89d52e11a8630aa7eb42fff3c9773fb Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Fran=C3=A7ois=20Roux?= <info@humanlearning.ch>
+Date: Wed, 16 Sep 2026 15:53:24 +0200
+Subject: [PATCH] arm64: dts: qcom: sp12: number CSI receiver lanes from zero
+
+The Gentoo overlay board patch numbers data-lanes from 1 on both sides of the
+link. The CSI receiver counts from 0, so <1 2 3 4> asks for a lane 4 that does
+not exist and the PHY refuses to probe:
+
+	qcom-mipi-csi2-phy ace4000.phy: Invalid lane 4
+	qcom-mipi-csi2-phy ace4000.phy: probe with driver failed with error -22
+
+CyberMyth's shipped device tree, which works on this machine, uses <0 1 2 3> and
+<0 1> on the four receiver endpoints and keeps <1 2 3 4> / <1 2> on the sensor
+endpoints. Matched to that. The two sources are by the same author but not the
+same revision.
+
+Assisted-by: Claude:claude-opus-5
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+---
+ arch/arm64/boot/dts/qcom/x1p42100-microsoft-sp12in.dts | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/qcom/x1p42100-microsoft-sp12in.dts b/arch/arm64/boot/dts/qcom/x1p42100-microsoft-sp12in.dts
+index 6f58cf5c4..6218a01b1 100644
+--- a/arch/arm64/boot/dts/qcom/x1p42100-microsoft-sp12in.dts
++++ b/arch/arm64/boot/dts/qcom/x1p42100-microsoft-sp12in.dts
+@@ -840,7 +840,7 @@ ports {
+ 		port@0 {
+ 			camss_csiphy0_inep: endpoint@0 {
+ 				reg = <0>;
+-				data-lanes = <1 2 3 4>;
++				data-lanes = <0 1 2 3>;  /* recepteur : numerotation a partir de 0 */
+ 				remote-endpoint = <&csiphy0_out_ep>;
+ 			};
+ 		};
+@@ -848,7 +848,7 @@ camss_csiphy0_inep: endpoint@0 {
+ 		port@1 {
+ 			camss_csiphy4_inep: endpoint@0 {
+ 				reg = <0>;
+-				data-lanes = <1 2>;
++				data-lanes = <0 1>;  /* recepteur : numerotation a partir de 0 */
+ 				remote-endpoint = <&csiphy4_out_ep>;
+ 			};
+ 		};
+@@ -973,7 +973,7 @@ port@0 {
+ 			csiphy0_in_ep: endpoint {
+ 				bus-type = <MEDIA_BUS_TYPE_CSI2_DPHY>;
+ 				clock-lanes = <0>;
+-				data-lanes = <1 2 3 4>;
++				data-lanes = <0 1 2 3>;  /* recepteur : numerotation a partir de 0 */
+ 				remote-endpoint = <&ov13858_ep>;
+ 			};
+ 		};
+@@ -1004,7 +1004,7 @@ port@0 {
+ 			csiphy4_in_ep0: endpoint {
+ 				bus-type = <MEDIA_BUS_TYPE_CSI2_DPHY>;
+ 				clock-lanes = <0>;
+-				data-lanes = <1 2>;
++				data-lanes = <0 1>;  /* recepteur : numerotation a partir de 0 */
+ 				remote-endpoint = <&ov02c10_ep>;
+ 			};
+ 
+-- 
+2.55.0
+
