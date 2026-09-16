@@ -17,6 +17,8 @@ d'origine ; voir le README racine pour la licence.
 | `0014` | caméras : PHY MIPI CSI-2, CAMSS x1p42100, capteurs ov13858 et ov02c10 — moitié pilote seulement, le device tree reste à greffer | Mias van Klei, via CyberMyth OS |
 | `0015` | DTS : device tree bâti depuis l'amont — caméras, volume remis à l'endroit, audio DisplayPort, iris, régulateurs ; plus `qcom,broken-reset` pour l'audio EL2 | Mias van Klei + ce dépôt |
 | `0016` | handover remoteproc en un coup (amont `bb7c5d6f5b41`, adapté à notre série attach) + `d3_closes_handle = false` pour la veille | amont + Mias van Klei, portés ici |
+| `0017` | DTS : lignes de données du récepteur CSI numérotées à partir de 0 — « Invalid lane 4 » | ce dépôt, d'après CyberMyth |
+| `0018` | DTS : réserve CMA de 512 Mio rétablie, sans quoi libcamera n'alloue pas une seule image | Mias van Klei (annulation de son 0015) |
 | `serie-complete/` | **les 16 patchs** séparant le noyau de référence de `next-20260626` — source correspondante complète | mixte, paternité préservée |
 | `audio-el2-serie.md` | notes sur la série remoteproc « attach » : mécanisme, pièges, avertissement ABI | Stephan Gerhold (miroir) |
 | `registry-next20260626.c` | table de registre SAM | Harrison van der Byl |

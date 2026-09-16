@@ -1,0 +1,5 @@
+# /dev/dma_heap/* nait en crw------- root:root, donc libcamera ne tourne qu'en
+# root. Meme mecanisme que pour /dev/video* et /dev/media* : uaccess fait poser
+# par logind une liste de controle d'acces au profit de l'utilisateur de la
+# session active. Le groupe video sert de repli pour les services systeme.
+SUBSYSTEM=="dma_heap", GROUP="video", MODE="0660", TAG+="uaccess"
