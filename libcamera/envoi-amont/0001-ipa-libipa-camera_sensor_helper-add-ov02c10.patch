@@ -1,0 +1,65 @@
+From 9090ff82bce93d8400d8edbd2975b7eb56339a6f Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Fran=C3=A7ois=20Roux?= <info@humanlearning.ch>
+Date: Mon, 21 Sep 2026 16:13:13 +0200
+Subject: [PATCH] ipa: libipa: camera_sensor_helper: add ov02c10
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Without an entry for ov02c10, the software ISP used by the simple
+pipeline handler can't run AGC for this sensor and logs:
+
+  IPASoft: Failed to create camera sensor helper for ov02c10
+
+The kernel driver (drivers/media/i2c/ov02c10.c) advertises analogue-gain
+register values in the range 0x10..0xf8 with a default of 0x10, and
+writes them to the 16-bit register at 0x3508 as (val << 4).  That
+register is graded in 1/256 steps, so both the control range and the
+register encoding agree on 1/16 steps: the default of 0x10 is unity gain
+and the maximum of 0xf8 is 15.5x.
+
+The sensor outputs 10-bit Bayer data (MEDIA_BUS_FMT_SGRBG10_1X10).  A
+dark-frame measurement gives a mean pedestal of 64.2 LSB with a standard
+deviation below 1.1 LSB, unchanged when the integration time is varied
+by a factor of 356 (4 to 1425 lines), which confirms a fixed 0x40
+pedestal rather than dark current.  That scales to 4096 at the 16-bit
+width expected by blackLevel(), as for the other OmniVision sensors in
+this file.
+
+Add a helper that follows the same pattern.  Tested on the front camera
+of a Microsoft Surface Pro 12 (Qualcomm X1P42100) driven by the qcom
+CAMSS pipeline.  Before the change the IPA reported "Exposure 4-2320,
+gain 16-248 (1)"; after it reports "Exposure 4-2320, gain 1-15.5
+(0.145)".
+
+Signed-off-by: François Roux <info@humanlearning.ch>
+---
+ src/ipa/libipa/camera_sensor_helper.cpp | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/src/ipa/libipa/camera_sensor_helper.cpp b/src/ipa/libipa/camera_sensor_helper.cpp
+index 9457d62b3..4b5c70f52 100644
+--- a/src/ipa/libipa/camera_sensor_helper.cpp
++++ b/src/ipa/libipa/camera_sensor_helper.cpp
+@@ -677,6 +677,18 @@ public:
+ };
+ REGISTER_CAMERA_SENSOR_HELPER("ov01a10", CameraSensorHelperOv01a10)
+ 
++class CameraSensorHelperOv02c10 : public CameraSensorHelper
++{
++public:
++	CameraSensorHelperOv02c10()
++	{
++		/* From dark frame measurement: 0x40 at 10bits. */
++		blackLevel_ = 4096;
++		gain_ = AnalogueGainLinear{ 1, 0, 0, 16 };
++	}
++};
++REGISTER_CAMERA_SENSOR_HELPER("ov02c10", CameraSensorHelperOv02c10)
++
+ class CameraSensorHelperOv08x40 : public CameraSensorHelper
+ {
+ public:
+-- 
+2.55.0
+
