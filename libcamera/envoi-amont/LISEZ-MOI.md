@@ -1,10 +1,17 @@
-# Envoi du helper `ov02c10` à libcamera — prêt, NON ENVOYÉ
+# Envoi du helper `ov02c10` à libcamera — ENVOYÉ le 2026-09-21
 
 ## État
 
-Patch préparé, vérifié, essai d'envoi à blanc concluant. **Rien n'a été transmis** :
-l'envoi à une liste de diffusion publique est une publication, elle attend un « oui »
-explicite de FR.
+**Envoyé le 2026-09-21 à 16:56 CEST**, après « oui » explicite de FR.
+
+- Destinataire : `libcamera-devel@lists.libcamera.org`
+- Expéditeur : `François Roux <info@humanlearning.ch>`
+- Message-ID : `<20260921145635.978219-1-info@humanlearning.ch>`
+- Réponse du serveur : `250` (accepté)
+
+⚠️ **Les réponses risquent le dossier indésirable.** La correspondance amont arrive sur
+info@humanlearning.ch et le filtre Infomaniak a déjà classé du courrier noyau en spam.
+Surveiller ce dossier, le Message-ID ci-dessus sert de fil.
 
 ## Ce qui a été fait
 
