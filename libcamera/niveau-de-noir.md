@@ -63,3 +63,57 @@ Le vrai manque n'est pas la fiche mais le **sensor helper** de l'`ov02c10`
 (`Failed to create camera sensor helper`) : sans lui l'IPA ne convertit pas le code de gain
 en gain réel. Modèle dérivé et validé dans `ov02c10-sensor-helper.md` ; il demande de
 rebâtir `libcamera`.
+
+---
+
+## Reprise du 2026-09-21 : la vérification manquante, obtenue autrement
+
+La première rédaction laissait un trou : « non établi que cette valeur soit indépendante de
+l'exposition et du gain ». FR a masqué l'objectif une seconde fois pour le combler.
+
+### Ce que la capture longue ne prouvait pas
+
+150 images (5 s) donnent un niveau parfaitement plat — 64,53 au début, 64,48 à la fin. J'ai
+failli y voir une preuve d'insensibilité à l'AGC. Puis la lecture du sous-périphérique
+(`/dev/v4l-subdev19`) a montré `analogue_gain = 16`, c'est-à-dire **l'unité, pendant toute
+la capture** : sur le flux `role=raw`, l'AGC ne tourne pas. La platitude ne prouvait donc
+rien du tout — voir [[hypothese-ecartee-verifier-le-levier]].
+
+### Ce qui est établi : l'indépendance à l'exposition
+
+En imposant les réglages par `v4l2-ctl` sur le sous-périphérique du capteur :
+
+| Exposition | Gain | Niveau de noir (10 bits) |
+|---|---|---|
+| 4 lignes | 16 (×1) | **64,16** |
+| 1425 lignes | 16 (×1) | **64,50** |
+
+**Un facteur 356 sur le temps d'intégration ne déplace le niveau que de 0,34 LSB.** Le
+courant d'obscurité est donc négligeable, et ce que l'on mesure est bien un **piédestal
+fixe**, pas un signal thermique accumulé. C'est précisément la question qui restait ouverte.
+
+### Ce qui reste non établi
+
+L'influence du **gain** : la capture à `exposure=4, analogue_gain=248` n'a produit aucune
+trame (le capteur ne diffuse pas dans cette combinaison), et celle à gain 248 en exposition
+normale était saturée, l'objectif n'étant plus masqué. Sans conséquence sur la conclusion :
+la question ouverte portait sur le courant d'obscurité, et elle est tranchée.
+
+### Conséquence : inchangée
+
+64,16 · 64,50 · 65,13 — toutes ces valeurs donnent **16** une fois ramenées aux 8 bits de
+l'ISP. C'est exactement le défaut de libcamera. Aucune fiche n'est écrite.
+
+Confirmation directe trouvée dans le journal pendant ces essais :
+
+```
+WARN IPAProxy Configuration file 'ov13858.yaml' not found for IPA module 'simple',
+              falling back to '/usr/share/libcamera/ipa/simple/uncalibrated.yaml'
+```
+
+### ⚠️ Manipuler les contrôles du capteur
+
+`v4l2-ctl -d /dev/v4l-subdev19 -c exposure=…,analogue_gain=…` fonctionne et **persiste à
+travers une capture** `cam` sur le flux brut. Utile pour ce genre de mesure, mais il faut
+**restaurer les valeurs ensuite** : vérifié après coup par une capture normale
+(`1920x1092-ABGR8888/sRGB`, 30 img/s).
