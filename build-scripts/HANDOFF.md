@@ -26,7 +26,7 @@ On a **réussi à faire tourner Linux sur le Surface Pro 12** (que rien ne suppo
    ```
    ssh root@<IP_DU_SP12>
    ```
-   **mot de passe : `sp12`**
+   **mot de passe : voir le gestionnaire de mots de passe (retiré du dépôt le 21/09/2026)**
 4. Lancer **`claude`** (déjà installé). S'authentifier.
 
 Helpers sur la clé : `/root/sp12-setup-gui.sh` (bureau Wayland sway), `/root/sp12-graft/` (audio/capteurs).

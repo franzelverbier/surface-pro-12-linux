@@ -60,6 +60,6 @@ Ajoutés APRÈS la première réussite pour supprimer les instabilités (veille 
 ## 🔌 Accès (rappel)
 Depuis une autre machine du réseau (CachyOS / téléphone) :
 ```bash
-ssh root@sp12.local        # ou ssh root@192.168.X.Y ; mot de passe : sp12
+ssh root@sp12.local        # ou ssh root@<IP_DU_SP12> ; mot de passe hors dépôt
 ```
 Voir `README.md` à la racine du dépôt.
