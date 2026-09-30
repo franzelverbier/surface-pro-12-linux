@@ -40,6 +40,15 @@ const versS2idle = corps => corps.map(l => l.startsWith('    linux ')
 const versCameras = corps => corps.map(l => l.startsWith('    devicetree ')
   ? '    devicetree /boot/sp12-el2-cam.dtb' : l);
 
+// Le test 7.3 avec le revert QoS ne change QUE le noyau : on dérive le corps de
+// amont-el1, dont le device tree (sp12-amont.dtb, celui de l'arbre 7.3) démarre
+// déjà sur d'autres noyaux. Garde : retour automatique au bout de dix minutes.
+const versQos73 = corps => corps.map(l => {
+  if (l.startsWith('    linux ')) return l.replace('/boot/Image ', '/boot/Image-7.3rc3-qos ') + ' sp12.autoreboot=600';
+  if (l.startsWith('    initrd ')) return '    initrd /boot/initramfs-7.3rc3-qos.img';
+  return l;
+});
+
 // --- ce qu'on garde, dans l'ordre d'affichage voulu -------------------------
 // ['motif de titre' | null, id, titre, [commentaires], transform?]
 // Un motif null introduit un séparateur de groupe.
@@ -103,6 +112,19 @@ const garder = [
     "16/09. Gardée pour revérifier après chaque correctif."]],
 
   [null, null, '═══ ESSAIS EN ATTENTE ═══'],
+
+  ['amont-el1', 'mainline-73-qos',
+   "SP12 — essai : mainline 7.3-rc3 + revert QoS  (EL1, retour auto 10 min)",
+   ["Le 7.3-rc3 se réinitialisait pendant les initcalls, même en defconfig. Le",
+    "15/09, Marc Zyngier a annulé en amont (2cc67425a97e) l'activation de la QoS",
+    "de l'interconnect x1e80100 (5a8b2cc36e79, 7.3-rc1) : les machines Purwa",
+    "« take a hard reset at boot time ». Ce noyau = /data/linux-7.3 + ce revert.",
+    "Même device tree et même ligne de commande que amont-el1 : seul le noyau change.",
+    "",
+    "Démarre  → c'était la QoS, et la voie vers un noyau amont est ouverte.",
+    "Replante → il y a autre chose ; noter jusqu'où l'écran défile.",
+    "sp12.autoreboot=600 : la machine revient seule au bout de dix minutes."],
+   versQos73],
 
   ['amont-el1-nft', 's2idle',
    "SP12 — essai : veille s2idle  (jamais tentée)",
