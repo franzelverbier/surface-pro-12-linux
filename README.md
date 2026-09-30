@@ -99,9 +99,11 @@ seul critère fiable.
 
 ## Mot de passe par défaut
 
-Les scripts de construction créent un compte root avec le mot de passe **`sp12`**
-(`build-scripts/build-stage4d.sh`). C'est un défaut d'installation assumé, pratique pour
-un premier accès SSH sur une machine sans écran.
+Les scripts de construction créent un compte root dont le mot de passe est **fourni à la
+construction** par la variable `SP12_ROOTPW` (`build-scripts/build-stage4d.sh` refuse de
+s'exécuter sans elle). Aucun mot de passe n'est plus écrit dans le dépôt depuis le 30/09/2026.
+⚠️ Les images construites avant cette date utilisaient un mot de passe par défaut resté dans
+l'historique Git : sur une telle machine, changer le mot de passe root sans attendre.
 
 🔒 **À changer dès le premier démarrage** — `passwd` — ou avant toute exposition réseau.
 

@@ -14,7 +14,7 @@
   - **SanDisk Portable SSD 2 To = disque Linux** 🐧 (image `sp12.img` 12 Go écrite en RAW dessus, 35 Mo/s, sans blocage car **un seul** SSD USB actif + lecture depuis l'interne).
   - **SHARGE 2 To (F:, exFAT « Ventoy ») = disque média, INTACT** (vidéos `Vidéos INP` 181 Go + `StreetParade` 175 Go conservées).
 - **GPT « RAW » sous Windows = normal** (image 12 Go sur disque 2 To → en-tête GPT de secours pas en fin de disque). L'UEFI boote quand même (table primaire valide, 55AA OK) — comme la clé 114 Go avant. À corriger sous Linux : `sgdisk -e /dev/sdX` puis agrandir la racine (`parted resizepart` + `resize2fs`).
-- **Boot** : éteindre Windows → UEFI (**Vol-Haut + Power**) → **Secure Boot OFF** → booter le **SanDisk**. (Conseil 1er boot : **débrancher la SHARGE**, ne garder que SanDisk + alim, pour la stabilité USB.) → WiFi WPA3 auto → `ssh root@<IP>` (mdp `sp12`) → `claude`.
+- **Boot** : éteindre Windows → UEFI (**Vol-Haut + Power**) → **Secure Boot OFF** → booter le **SanDisk**. (Conseil 1er boot : **débrancher la SHARGE**, ne garder que SanDisk + alim, pour la stabilité USB.) → WiFi WPA3 auto → `ssh root@<IP>` (mdp : celui fixé à la construction) → `claude`.
 - **Script d'écriture réutilisable** : `scratchpad/write-linux-sandisk.ps1` (cible le SanDisk par nom, refuse SHARGE/interne). Image source : `C:\sp12-linux\sp12.img`.
 - **⚠️ 1er boot a ÉCHOUÉ (retour direct Windows) → CAUSE TROUVÉE : GPT malformée.** Écrire une image 12 Go en RAW sur un disque 2 To laisse l'en-tête GPT primaire qui décrit un disque de 12 Go (`AlternateLBA=25165823`, `LastUsableLBA=25165790`) au lieu du plein 2 To → **l'UEFI du SP12 rejette la table comme corrompue → le SanDisk n'apparaît PAS comme bootable**. (Contrairement à ce que je pensais, ce UEFI n'est PAS tolérant à ça.) **FIX = réparation GPT chirurgicale** : `scratchpad/repair-gpt.ps1` (réécrit en-tête primaire `AlternateLBA`/`LastUsableLBA` au plein disque + écrit en-tête+table de secours en fin de disque, CRC32 zlib recalculé, **auto-test CRC sur l'en-tête existant avant toute écriture**, ne touche pas les partitions/données). Après réparation : Windows lit Part1=ESP(EFI System)+Part2=Linux, `REPARATION REUSSIE`. **À refaire systématiquement après tout `dd`/raw-write d'une petite image sur un grand disque** (ou faire `sgdisk -e /dev/sdX` une fois sous Linux).
 
@@ -30,7 +30,7 @@
 - L'image est copiée en **fichier** `D:\sp12-linux.img` (12 Go) sur la partition Ventoy de la SHARGE (données existantes intactes : Adobe, ISO, etc.).
 - Hook **`vtoyboot`** (aarch64) injecté dans l'initramfs (init **udev**, pas systemd) → l'image boote comme **vdisk Ventoy**.
 - **Boot** : démarrer la SHARGE → menu Ventoy → choisir **`sp12-linux.img`**. (Si Ventoy dit « not contiguous » : recopier le fichier / défragmenter.)
-- WiFi WPA3-SAE + SSH auto déjà dans l'image → au boot : se connecte au WiFi → `ssh root@<IP>` (mdp `sp12`) → `claude` (pré-installé).
+- WiFi WPA3-SAE + SSH auto déjà dans l'image → au boot : se connecte au WiFi → `ssh root@<IP>` (mdp : celui fixé à la construction) → `claude` (pré-installé).
 - ⚠️ Écran : le panel SP12 a besoin de `msm` (capricieux). `nomodeset` = écran noir mais boote ; sans = parfois visible. Viser le **headless + SSH** (l'écran importe peu).
 
 **Cmdline image actuelle** : `... console=tty0 loglevel=7` (= la v4 qui bootait visiblement) — sans `nomodeset`/`usbcore`/`regdom` (ces ajouts dégradaient).

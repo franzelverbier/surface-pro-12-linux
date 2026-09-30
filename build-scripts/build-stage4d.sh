@@ -44,8 +44,8 @@ cleanup(){ umount -R "$ROOT/proc" 2>/dev/null||true; umount -R "$ROOT/sys" 2>/de
 trap cleanup EXIT
 
 chroot "$ROOT" /bin/bash -ec "
-echo 'root:sp12' | chpasswd
-echo 'autologin root + mdp=sp12 OK'
+echo 'root:${SP12_ROOTPW:?définir SP12_ROOTPW : mot de passe root de la machine}' | chpasswd
+echo 'autologin root + mot de passe root OK'
 # initramfs SANS autodetect -> portable (tous modules: USB/dwc3/phy/ext4/msm)
 mkinitcpio -k $KREL -g /boot/initramfs-sp12.img -S autodetect 2>&1 | tail -15
 "

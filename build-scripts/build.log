@@ -94,7 +94,7 @@ DTB: 196332 octets
 espace WSL libre: 940G
 === STAGE4c done 16:32:52 ===
 === STAGE4d chroot config start 16:35:35 ===
-autologin root + mdp=sp12 OK
+autologin root + mdp=<caviardé> OK
   -> Running build hook: [modconf]
   -> Running build hook: [kms]
 ==> WARNING: No module containing the symbol 'drm_privacy_screen_register' found in: 'drivers/platform'

@@ -5,7 +5,7 @@ echo "=== STAGE10b v5 rebuild start $(date -u +%H:%M:%S) ==="
 ROOT=/root/sp12/rootfs
 IMG=/root/sp12/sp12.img
 export MTOOLS_SKIP_CHECK=1
-# sshd : login root par mot de passe (sp12)
+# sshd : login root par mot de passe (celui de SP12_ROOTPW, fixé au stage 4d)
 mkdir -p "$ROOT/etc/ssh/sshd_config.d"
 printf 'PermitRootLogin yes\nPasswordAuthentication yes\n' > "$ROOT/etc/ssh/sshd_config.d/10-sp12.conf"
 # tweak USB anti-capricieux

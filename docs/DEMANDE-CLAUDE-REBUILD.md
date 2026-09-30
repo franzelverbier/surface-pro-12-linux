@@ -91,7 +91,7 @@ network={
 **SSH :**
 - `/etc/ssh/sshd_config.d/10-sp12.conf` : `PermitRootLogin yes` + `PasswordAuthentication yes`.
 - Clés d'hôte présentes (`ssh-keygen -A` si absentes).
-- root pw = `sp12` ; hostname = `sp12`.
+- root pw = <caviardé, voir SP12_ROOTPW> ; hostname = `sp12`.
 
 ### 4. Écrire l'image + réparer la GPT (impératif)
 ```bash
@@ -146,5 +146,5 @@ Le **DTS du SP12 (x1p42100) est en mainline dans Linux 7.2** (rc1 = 28/06/2026 ;
 | SSD 1,8 To | SanDisk Portable SSD — VID:PID **`0781:55bb`** — UAS → quirk requis |
 | Clé 114 Go | SanDisk 3.2Gen1 — VID:PID **`0781:55a9`** — flash BOT, stable |
 | WiFi | Qualcomm WCN7850 / FastConnect 7800 — SSID `<REDACTED>` / `<REDACTED>` |
-| root pw | `sp12` — hostname `sp12` — joignable `sp12.local` |
+| root pw | <caviardé> — hostname `sp12` — joignable `sp12.local` |
 | Build (Windows) | `C:\sp12-linux\` : `sp12.img`, `build-stage*.sh`, `graft/`, scripts PS1 |

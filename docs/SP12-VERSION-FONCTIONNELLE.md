@@ -20,7 +20,7 @@
 | Réseau | **`wpa_supplicant@wlan0` + `dhcpcd` + `sshd`** activés (⚠️ **pas** NetworkManager) |
 | Config WiFi | `/etc/wpa_supplicant/wpa_supplicant-wlan0.conf` : `ssid="<REDACTED>"`, `psk="<REDACTED>"` (WPA2 suffit, pas besoin de SAE) |
 | Firmware WiFi | `ath12k/WCN7850/hw2.0/` : `amss.bin`, `board-2.bin`, **`board.bin`** (repli custom board-id 255), `m3.bin` |
-| root pw | `sp12` ; hostname `sp12` ; joignable `sp12.local` |
+| root pw | <caviardé> ; hostname `sp12` ; joignable `sp12.local` |
 | Passerelle | `192.168.X.Y` (FRITZ!Box) |
 
 ## 🕕 Date de compilation du noyau (RÉFÉRENCE — ne pas confondre)

@@ -2,8 +2,8 @@
 
 Playbook complet à utiliser **depuis la machine CachyOS** pour se connecter au Surface Pro 12" (Snapdragon **x1p42100**, ARM64) qui tourne sous Linux **headless**, et pour le réparer/reconstruire si besoin.
 
-> 🔑 **Accès** — le compte root est créé avec le mot de passe par défaut `sp12`
-> (voir le README). Le WiFi se configure dans
+> 🔑 **Accès** — le compte root est créé avec le mot de passe fourni à la construction
+> (`SP12_ROOTPW`, voir le README). Le WiFi se configure dans
 > `/etc/wpa_supplicant/wpa_supplicant-wlan0.conf`.
 
 ---
