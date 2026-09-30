@@ -58,6 +58,15 @@ const versDsp73 = corps => versQos73(corps).map(l => l.startsWith('    linux ')
   ? l.replace(' modprobe.blacklist=qcom_q6v5_pas', '').replace(' sp12.autoreboot=600', '')
   : l);
 
+// Repos profond : même corps que el2-cam (courant + caméras), mais on laisse le
+// noyau éteindre horloges et domaines inutilisés, et fw_devlink appeler
+// sync_state après délai : GCC et GPUCC attendaient à jamais 3d6a000.gmu, qui
+// n'a pas de pilote rattaché. Garde : retour automatique au bout de dix minutes.
+const versReposProfond = corps => versCameras(corps).map(l => l.startsWith('    linux ')
+  ? l.replace(' clk_ignore_unused', '').replace(' pd_ignore_unused', '')
+    + ' fw_devlink.sync_state=timeout sp12.autoreboot=600'
+  : l);
+
 // --- ce qu'on garde, dans l'ordre d'affichage voulu -------------------------
 // ['motif de titre' | null, id, titre, [commentaires], transform?]
 // Un motif null introduit un séparateur de groupe.
@@ -121,6 +130,18 @@ const garder = [
     "16/09. Gardée pour revérifier après chaque correctif."]],
 
   [null, null, '═══ ESSAIS EN ATTENTE ═══'],
+
+  ['courant', 'repos-profond',
+   "SP12 — essai : repos profond  (el2-cam sans clk/pd_ignore_unused, retour auto 10 min)",
+   ["La veille s2idle marche (30/09, ~1,3 W) mais aosd/cxsd restent à 0 : la puce",
+    "ne s'endort pas vraiment. Deux freins : clk_ignore_unused pd_ignore_unused",
+    "gardent allumé tout ce qui n'est pas réclamé, et GCC + GPUCC restent en",
+    "« sync_state() pending » à cause de 3d6a000.gmu, sans pilote rattaché.",
+    "Ici : el2-cam moins ces deux options, plus fw_devlink.sync_state=timeout.",
+    "",
+    "Écran noir ou redémarrage → séparer les deux leviers dans deux entrées.",
+    "sp12.autoreboot=600 : la machine revient seule au bout de dix minutes."],
+   versReposProfond],
 
   ['amont-el1', 'mainline-73-qos',
    "SP12 — essai : mainline 7.3-rc3 + revert QoS  (EL1, retour auto 10 min)",
