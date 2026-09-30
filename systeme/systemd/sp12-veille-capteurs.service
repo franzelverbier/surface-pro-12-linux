@@ -1,0 +1,16 @@
+# SP12 — 30/09/2026 : met en pause le domaine capteurs de l'ADSP (hexagonrpc)
+# pendant la veille, comme lors des deux essais réussis. StopWhenUnneeded fait
+# tomber l'unité à la sortie de sleep.target, et ExecStop relance hexagonrpc.
+[Unit]
+Description=SP12 - Pause du domaine capteurs de l'ADSP pendant la veille
+Before=sleep.target
+StopWhenUnneeded=yes
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=-/usr/bin/systemctl stop hexagonrpc.service
+ExecStop=-/usr/bin/systemctl --no-block start hexagonrpc.service
+
+[Install]
+WantedBy=sleep.target
