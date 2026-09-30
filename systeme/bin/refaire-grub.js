@@ -49,6 +49,15 @@ const versQos73 = corps => corps.map(l => {
   return l;
 });
 
+// Même noyau 7.3, DSP libre dès le démarrage. La liste noire de amont-el1
+// protégeait l'ABI des modules 7.1 ; 7.3 a son propre arbre de modules. Chargé à
+// chaud cinq minutes après le boot (30/09), l'ADSP plantait dans charger_process,
+// puis revenait avec l'APM muet et la batterie figée. Plus de garde-fou : 7.3
+// démarre et le clavier répond.
+const versDsp73 = corps => versQos73(corps).map(l => l.startsWith('    linux ')
+  ? l.replace(' modprobe.blacklist=qcom_q6v5_pas', '').replace(' sp12.autoreboot=600', '')
+  : l);
+
 // --- ce qu'on garde, dans l'ordre d'affichage voulu -------------------------
 // ['motif de titre' | null, id, titre, [commentaires], transform?]
 // Un motif null introduit un séparateur de groupe.
@@ -125,6 +134,15 @@ const garder = [
     "Replante → il y a autre chose ; noter jusqu'où l'écran défile.",
     "sp12.autoreboot=600 : la machine revient seule au bout de dix minutes."],
    versQos73],
+
+  ['amont-el1', 'mainline-73-dsp',
+   "SP12 — essai : mainline 7.3 + DSP dès le démarrage  (EL1, son + batterie)",
+   ["L'entrée précédente A DÉMARRÉ le 30/09 : la QoS était la cause. Ici, même",
+    "noyau, mais le DSP n'est plus sur liste noire. Il est donc chargé au démarrage,",
+    "comme sur les portables X1 amont. À vérifier : son (APM qui répond),",
+    "batterie qui se met à jour, un seul démarrage ADSP sans crash charger_process.",
+    "Pas de redémarrage automatique."],
+   versDsp73],
 
   ['amont-el1-nft', 's2idle',
    "SP12 — essai : veille s2idle  (jamais tentée)",
