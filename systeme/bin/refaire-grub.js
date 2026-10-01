@@ -58,14 +58,16 @@ const versDsp73 = corps => versQos73(corps).map(l => l.startsWith('    linux ')
   ? l.replace(' modprobe.blacklist=qcom_q6v5_pas', '').replace(' sp12.autoreboot=600', '')
   : l);
 
-// Repos profond : même corps que el2-cam (courant + caméras), mais on laisse le
-// noyau éteindre horloges et domaines inutilisés, et fw_devlink appeler
-// sync_state après délai : GCC et GPUCC attendaient à jamais 3d6a000.gmu, qui
-// n'a pas de pilote rattaché. Garde : retour automatique au bout de dix minutes.
-const versReposProfond = corps => versCameras(corps).map(l => l.startsWith('    linux ')
-  ? l.replace(' clk_ignore_unused', '').replace(' pd_ignore_unused', '')
-    + ' fw_devlink.sync_state=timeout sp12.autoreboot=150'
-  : l);
+// Repos profond : même corps que el2-cam, avec le DTB complété de l'état de
+// repos « système » SS3 (dts/etat-systeme-ss3.dtso). Sans lui, power-domain-system
+// n'a aucun état et l'APSS ne dort jamais. Options de démarrage inchangées : les
+// deux leviers du 01/10 (clk/pd_ignore_unused, sync_state) n'apportaient rien
+// sans SS3 et ont donné une fois un affichage en damier. Garde : 10 minutes.
+const versReposProfond = corps => versCameras(corps).map(l => {
+  if (l.startsWith('    devicetree ')) return '    devicetree /boot/sp12-el2-cam-ss3.dtb';
+  if (l.startsWith('    linux ')) return l + ' sp12.autoreboot=600';
+  return l;
+});
 
 // --- ce qu'on garde, dans l'ordre d'affichage voulu -------------------------
 // ['motif de titre' | null, id, titre, [commentaires], transform?]
@@ -132,17 +134,14 @@ const garder = [
   [null, null, '═══ ESSAIS EN ATTENTE ═══'],
 
   ['courant', 'repos-profond',
-   "SP12 — essai : repos profond  (instrumenté, retour auto 2 min 30)",
-   ["La veille s2idle marche (30/09, ~1,3 W) mais aosd/cxsd restent à 0 : la puce",
-    "ne s'endort pas vraiment. Deux freins : clk_ignore_unused pd_ignore_unused",
-    "gardent allumé tout ce qui n'est pas réclamé, et GCC + GPUCC restent en",
-    "« sync_state() pending » à cause de 3d6a000.gmu, sans pilote rattaché.",
-    "Ici : el2-cam moins ces deux options, plus fw_devlink.sync_state=timeout.",
+   "SP12 — essai : repos profond  (el2-cam + état système SS3, retour auto 10 min)",
+   ["La veille s2idle marche (~1,3 W) mais l'APSS ne dort jamais (qcom_stats",
+    "apss/aosd/cxsd à 0) : le DTB de juin ne déclare AUCUN état de repos pour",
+    "power-domain-system. L'amont, si (domain_ss3, 0x0200c354). Ici : el2-cam",
+    "avec ce seul ajout, par overlay. Après une veille, lire qcom_stats.",
     "",
-    "1er essai (01/10) : image en 4 bandes verticales en damier = l'affichage",
-    "manque de débit. sp12-capture-horloges.service photographie horloges,",
-    "domaines et interconnexions avant (≈8 s) et après (60 s) le sync_state forcé.",
-    "Rien à faire : la machine revient seule au bout de 2 min 30."],
+    "Gel au repos ou redémarrage → l'état SS3 ne convient pas en EL2.",
+    "sp12.autoreboot=600 : la machine revient seule au bout de dix minutes."],
    versReposProfond],
 
   ['amont-el1', 'mainline-73-qos',

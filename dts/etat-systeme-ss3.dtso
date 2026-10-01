@@ -1,0 +1,21 @@
+// SP12 — 01/10/2026 : état de repos « système » (SS3) repris du DTS amont
+// (hamoa.dtsi : system_pd { domain-idle-states = <&domain_ss3>; }). Le DTB de
+// juin n'en déclarait aucun : power-domain-system ne pouvait donc jamais
+// s'éteindre, l'APSS ne dormait jamais (qcom_stats apss/aosd/cxsd à 0), et la
+// puce restait éveillée en veille s2idle. Valeurs copiées du DTB amont 7.3.
+/dts-v1/;
+/plugin/;
+
+&{/cpus/domain-idle-states} {
+	domain_ss3: domain-sleep-0 {
+		compatible = "domain-idle-state";
+		arm,psci-suspend-param = <0x0200c354>;
+		entry-latency-us = <2500>;
+		exit-latency-us = <2500>;
+		min-residency-us = <9000>;
+	};
+};
+
+&{/psci/power-domain-system} {
+	domain-idle-states = <&domain_ss3>;
+};
