@@ -1,0 +1,17 @@
+# SP12 — 01/10/2026 : ne fait rien hors de l'entrée GRUB « repos-profond ».
+# Démarre tôt (avant le sync_state forcé de GCC vers 15,8 s), mais seulement une
+# fois /data et debugfs montés ; Type=simple pour ne retarder aucune étape.
+[Unit]
+Description=SP12 - Capture horloges et domaines (essai repos profond)
+ConditionKernelCommandLine=fw_devlink.sync_state=timeout
+DefaultDependencies=no
+RequiresMountsFor=/data/sp12data
+After=sys-kernel-debug.mount
+Wants=sys-kernel-debug.mount
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/node /usr/local/bin/sp12-capture-horloges.js
+
+[Install]
+WantedBy=sysinit.target

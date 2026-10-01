@@ -64,7 +64,7 @@ const versDsp73 = corps => versQos73(corps).map(l => l.startsWith('    linux ')
 // n'a pas de pilote rattaché. Garde : retour automatique au bout de dix minutes.
 const versReposProfond = corps => versCameras(corps).map(l => l.startsWith('    linux ')
   ? l.replace(' clk_ignore_unused', '').replace(' pd_ignore_unused', '')
-    + ' fw_devlink.sync_state=timeout sp12.autoreboot=600'
+    + ' fw_devlink.sync_state=timeout sp12.autoreboot=150'
   : l);
 
 // --- ce qu'on garde, dans l'ordre d'affichage voulu -------------------------
@@ -132,15 +132,17 @@ const garder = [
   [null, null, '═══ ESSAIS EN ATTENTE ═══'],
 
   ['courant', 'repos-profond',
-   "SP12 — essai : repos profond  (el2-cam sans clk/pd_ignore_unused, retour auto 10 min)",
+   "SP12 — essai : repos profond  (instrumenté, retour auto 2 min 30)",
    ["La veille s2idle marche (30/09, ~1,3 W) mais aosd/cxsd restent à 0 : la puce",
     "ne s'endort pas vraiment. Deux freins : clk_ignore_unused pd_ignore_unused",
     "gardent allumé tout ce qui n'est pas réclamé, et GCC + GPUCC restent en",
     "« sync_state() pending » à cause de 3d6a000.gmu, sans pilote rattaché.",
     "Ici : el2-cam moins ces deux options, plus fw_devlink.sync_state=timeout.",
     "",
-    "Écran noir ou redémarrage → séparer les deux leviers dans deux entrées.",
-    "sp12.autoreboot=600 : la machine revient seule au bout de dix minutes."],
+    "1er essai (01/10) : image en 4 bandes verticales en damier = l'affichage",
+    "manque de débit. sp12-capture-horloges.service photographie horloges,",
+    "domaines et interconnexions avant (≈8 s) et après (60 s) le sync_state forcé.",
+    "Rien à faire : la machine revient seule au bout de 2 min 30."],
    versReposProfond],
 
   ['amont-el1', 'mainline-73-qos',
