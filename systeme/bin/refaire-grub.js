@@ -35,6 +35,15 @@ const versS2idle = corps => corps.map(l => l.startsWith('    linux ')
   ? l.replace('loglevel=4', 'loglevel=7') + ' mem_sleep_default=s2idle systemd.mask=hexagonrpc.service'
   : l);
 
+// Repos profond en EL1 (01/10) : l'entrée s2idle accepte l'état système SS3 (une
+// seule entrée tenue en veille) mais CX ne s'effondre pas. On retire les deux
+// options qui gardent horloges et domaines allumés, et on laisse GCC/GPUCC faire
+// leur sync_state (3d6a000.gmu n'a pas de pilote). Garde : dix minutes.
+const versS2idleSansIgnore = corps => versS2idle(corps).map(l => l.startsWith('    linux ')
+  ? l.replace(' clk_ignore_unused', '').replace(' pd_ignore_unused', '')
+    + ' fw_devlink.sync_state=timeout sp12.autoreboot=600'
+  : l);
+
 // La greffe caméra ne change QUE le device tree : on dérive le corps de
 // « courant » plutôt que de retaper une ligne de commande.
 const versCameras = corps => corps.map(l => l.startsWith('    devicetree ')
@@ -172,6 +181,15 @@ const garder = [
     "loglevel=7. Sur -nft, donc AVEC le correctif de reprise du SAM (patches/0016)",
     "— l'essayer sur le noyau de base testerait un noyau qui ne l'a pas."],
    versS2idle],
+
+  ['amont-el1-nft', 's2idle-cx',
+   "SP12 — essai : veille EL1 sans clk/pd_ignore_unused  (repos profond, retour auto 10 min)",
+   ["Entrée précédente moins clk_ignore_unused pd_ignore_unused, plus",
+    "fw_devlink.sync_state=timeout. En EL1 le firmware accepte l'état système",
+    "(01/10), reste à savoir si CX s'effondre une fois les horloges libérées.",
+    "Après une veille d'une minute : qcom_stats aosd/cxsd > 0 = gagné.",
+    "Damier à l'écran (vu une fois en EL2) : attendre le retour automatique."],
+   versS2idleSansIgnore],
 
   ['cybermyth', 'cybermyth',
    "SP12 — essai : noyau CyberMyth 7.2.3  (référence qui marche ailleurs)",
