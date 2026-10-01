@@ -41,7 +41,7 @@ const versS2idle = corps => corps.map(l => l.startsWith('    linux ')
 // leur sync_state (3d6a000.gmu n'a pas de pilote). Garde : dix minutes.
 const versS2idleSansIgnore = corps => versS2idle(corps).map(l => l.startsWith('    linux ')
   ? l.replace(' clk_ignore_unused', '').replace(' pd_ignore_unused', '')
-    + ' fw_devlink.sync_state=timeout sp12.autoreboot=600'
+    + ' fw_devlink.sync_state=timeout sp12.essai_veille sp12.autoreboot=600'
   : l);
 
 // La greffe caméra ne change QUE le device tree : on dérive le corps de
@@ -183,12 +183,14 @@ const garder = [
    versS2idle],
 
   ['amont-el1-nft', 's2idle-cx',
-   "SP12 — essai : veille EL1 sans clk/pd_ignore_unused  (repos profond, retour auto 10 min)",
+   "SP12 — essai AUTO : veille EL1 sans clk/pd_ignore_unused  (veille à 1 min 30, réveiller au bouton)",
    ["Entrée précédente moins clk_ignore_unused pd_ignore_unused, plus",
     "fw_devlink.sync_state=timeout. En EL1 le firmware accepte l'état système",
     "(01/10), reste à savoir si CX s'effondre une fois les horloges libérées.",
     "Après une veille d'une minute : qcom_stats aosd/cxsd > 0 = gagné.",
-    "Damier à l'écran (vu une fois en EL2) : attendre le retour automatique."],
+    "Damier à l'écran (2 démarrages sur 3 sans clk_ignore_unused) : sans importance.",
+    "sp12.essai_veille : à 90 s, sp12-essai-veille.js relève qcom_stats, met en veille,",
+    "relève au réveil (bouton), écrit /data/sp12data/diag/essai-veille-*.txt et redémarre."],
    versS2idleSansIgnore],
 
   ['cybermyth', 'cybermyth',

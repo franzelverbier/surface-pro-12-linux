@@ -1,0 +1,13 @@
+# SP12 — 01/10/2026 : ne fait rien hors d'une entrée GRUB portant sp12.essai_veille.
+[Unit]
+Description=SP12 - Essai automatique de repos profond (veille puis redémarrage)
+ConditionKernelCommandLine=sp12.essai_veille
+RequiresMountsFor=/data/sp12data
+After=multi-user.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/node /usr/local/bin/sp12-essai-veille.js
+
+[Install]
+WantedBy=multi-user.target
