@@ -1,0 +1,37 @@
+From: François Roux <info@humanlearning.ch>
+To: Barnabás Pőcze <barnabas.pocze@ideasonboard.com>
+Cc: libcamera-devel@lists.libcamera.org
+Subject: Re: [PATCH] ipa: libipa: camera_sensor_helper: add ov02c10
+
+Hi Barnabás,
+
+Thanks for the review.
+
+On "can't run AGC": you are right, the simple IPA still runs its fallback
+AGC. I'll reword that.
+
+I ran the experiment you suggested, without rebuilding the driver: while
+streaming raw frames with the lens covered, I rewrote 0x4003 from 0x40 to
+0x80 over I2C on the CCI bus. The black level followed on the very next
+frame:
+
+    frames 0-40   (0x4003 = 0x40):  64.19 LSB (10-bit)
+    frames 41-149 (0x4003 = 0x80): 128.19 LSB
+
+All four Bayer channels moved by +64.0 (Gr 64.20 -> 128.18, R 64.77 ->
+128.74, B 64.13 -> 128.12, Gb 64.19 -> 128.18), with unchanged noise. So
+the black level is exactly the BLC target the driver programs in
+0x4002/0x4003. The measurement and the driver agree.
+
+Since Martin's patch 28174 adds the same helper with the same values, I'm
+happy for that one to be merged instead, whichever you prefer. In that
+case, please feel free to add:
+
+    Tested-by: François Roux <info@humanlearning.ch>
+
+(front camera of a Surface Pro 12, X1P42100, CAMSS + simple pipeline).
+Otherwise I'll send a v2 that cites the driver's BLC target as the source,
+with the measurement as confirmation, and drops the AGC claim.
+
+Best regards,
+François
