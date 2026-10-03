@@ -60,7 +60,7 @@ const vers73El2 = corps => corps.map(l => {
 // loglevel=7 pour voir où ça s'arrête.
 const vers73El2Juin = corps => corps.map(l => {
   if (l.startsWith('    devicetree ')) return '    devicetree /boot/sp12-el2-cam.dtb';
-  if (l.startsWith('    linux ')) return l.replace('loglevel=4', 'loglevel=7').replace('/boot/Image-7.3rc3-qos ', '/boot/Image-7.3rc3-el2 ');
+  if (l.startsWith('    linux ')) return l.replace('/boot/Image-7.3rc3-qos ', '/boot/Image-7.3rc3-el2 ').replace(' sp12.autoreboot=600', '');
   return l;
 });
 // Image-7.3rc3-el2 (03/10, 18:05) = Image-7.3rc3-qos + correctifs SMP2P 0003-0008 de la
@@ -96,11 +96,14 @@ const garder = [
    vers73El2],
 
   ['mainline-73-el2', 'mainline-73-el2-juin',
-   "SP12 — essai : 7.3 en EL2 avec le DTB de juin  (verbeux, retour auto 10 min)",
+   "SP12 — 7.3 en EL2 : KVM + son + caméras + batterie  (candidat au quotidien)",
    ["Le 03/10, le 7.3 avec le DTB EL2 amont a fait défiler du texte un bon moment,",
     "puis écran noir (bouton maintenu ; rien dans le journal ni pstore, UFS en module).",
     "Ici le même noyau avec le DTB de juin qui marche en EL2 sous -nft.",
-    "Démarre = le DTS amont est en cause en EL2. Noir = c'est le noyau 7.3 en EL2."],
+    "Démarre = le DTS amont est en cause en EL2. Noir = c'est le noyau 7.3 en EL2.",
+    "RÉSULTAT (03/10) : démarre. Avec patches/7.3 0001-0010 (QoS, attache DSP, SMP2P,",
+    "caméras) : EL2+KVM, ADSP+CDSP rattachés, son, batterie, 2 caméras à 30 img/s.",
+    "Plus de garde-fou ; config dans kernel/config-7.3.0-rc3-mainline-el2."],
    vers73El2Juin],
 
   ['mainline-73-dsp', 'mainline-73-dsp',
