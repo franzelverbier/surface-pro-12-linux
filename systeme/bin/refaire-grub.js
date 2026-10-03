@@ -60,9 +60,12 @@ const vers73El2 = corps => corps.map(l => {
 // loglevel=7 pour voir où ça s'arrête.
 const vers73El2Juin = corps => corps.map(l => {
   if (l.startsWith('    devicetree ')) return '    devicetree /boot/sp12-el2-cam.dtb';
-  if (l.startsWith('    linux ')) return l.replace('loglevel=4', 'loglevel=7');
+  if (l.startsWith('    linux ')) return l.replace('loglevel=4', 'loglevel=7').replace('/boot/Image-7.3rc3-qos ', '/boot/Image-7.3rc3-el2 ');
   return l;
 });
+// Image-7.3rc3-el2 (03/10, 18:05) = Image-7.3rc3-qos + correctifs SMP2P 0003-0008 de la
+// série « attach » (dont « Take over outgoing SMEM items from boot firmware ») :
+// l'ADSP, que l'UEFI sollicite pour la charge, ne levait pas son « ready » sous 7.3.
 
 // --- ce qu'on garde, dans l'ordre d'affichage voulu -------------------------
 // ['motif de titre' | null, id, titre, [commentaires], transform?]
