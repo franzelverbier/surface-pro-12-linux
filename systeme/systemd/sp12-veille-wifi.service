@@ -1,0 +1,20 @@
+# SP12 — 03/10/2026 : sous 7.3, ath12k ne reprend pas après s2idle (« timeout while
+# waiting for restart complete », pci_pm_resume -110, puis WMI en échec en boucle) ;
+# la puce WCN7850 ne redémarre pas son firmware. Décharger le pilote avant la veille
+# et le recharger au réveil refait la séquence de sonde, qui marche (vérifié : 1730
+# Mbit/s après rechargement). Inutile sous -nft, où la reprise fonctionne : la
+# condition sur la version de noyau l'écarte.
+[Unit]
+Description=SP12 - Décharger le WiFi ath12k pendant la veille (noyau >= 7.3)
+Before=sleep.target
+StopWhenUnneeded=yes
+ConditionKernelVersion=>=7.3
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=-/usr/bin/modprobe -r ath12k_wifi7
+ExecStop=-/usr/bin/modprobe ath12k_wifi7
+
+[Install]
+WantedBy=sleep.target
