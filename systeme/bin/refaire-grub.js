@@ -53,6 +53,17 @@ const vers73El2 = corps => corps.map(l => {
   return l;
 });
 
+// 7.3 en EL2 avec NOTRE DTB de juin (03/10) : le DTB amont donne un écran noir en
+// EL2 avec le noyau -nft comme avec le 7.3 ; le DTB de juin + caméras (el2-cam)
+// démarre en EL2 avec -nft. Même noyau 7.3 que mainline-73-el2, seul le DTB change :
+// démarre -> c'est le DTS amont en EL2 ; écran noir -> c'est le noyau 7.3 en EL2.
+// loglevel=7 pour voir où ça s'arrête.
+const vers73El2Juin = corps => corps.map(l => {
+  if (l.startsWith('    devicetree ')) return '    devicetree /boot/sp12-el2-cam.dtb';
+  if (l.startsWith('    linux ')) return l.replace('loglevel=4', 'loglevel=7');
+  return l;
+});
+
 // --- ce qu'on garde, dans l'ordre d'affichage voulu -------------------------
 // ['motif de titre' | null, id, titre, [commentaires], transform?]
 // Un motif null introduit un séparateur de groupe.
@@ -80,6 +91,14 @@ const garder = [
     "atteint. À vérifier : /dev/kvm, écran, WiFi, DSP (le 7.3 sait-il s'y rattacher",
     "en EL2 ?). Écran noir : maintenir le bouton marche, l'entrée 1 démarre ensuite."],
    vers73El2],
+
+  ['mainline-73-el2', 'mainline-73-el2-juin',
+   "SP12 — essai : 7.3 en EL2 avec le DTB de juin  (verbeux, retour auto 10 min)",
+   ["Le 03/10, le 7.3 avec le DTB EL2 amont a fait défiler du texte un bon moment,",
+    "puis écran noir (bouton maintenu ; rien dans le journal ni pstore, UFS en module).",
+    "Ici le même noyau avec le DTB de juin qui marche en EL2 sous -nft.",
+    "Démarre = le DTS amont est en cause en EL2. Noir = c'est le noyau 7.3 en EL2."],
+   vers73El2Juin],
 
   ['mainline-73-dsp', 'mainline-73-dsp',
    "SP12 — essai : mainline 7.3 en EL1  (son à finir, WiFi 2161 Mbit/s)",
