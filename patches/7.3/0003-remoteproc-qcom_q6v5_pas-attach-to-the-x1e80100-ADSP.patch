@@ -1,0 +1,39 @@
+From e333ae97e48447333497e67b8dbe05f52f8c7625 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Fran=C3=A7ois=20Roux?= <info@humanlearning.ch>
+Date: Sat, 3 Oct 2026 17:57:45 +0200
+Subject: [PATCH 3/3] remoteproc: qcom_q6v5_pas: attach to the x1e80100 ADSP
+ and CDSP started by the firmware
+
+When Linux runs at EL2 (slbounce), TrustZone refuses the PAS service, so the
+ADSP and CDSP left running by UEFI must be attached to rather than reloaded.
+qcom_pas_attach() falls back to a normal start when the ready interrupt is not
+asserted, so EL1 boots keep working.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ drivers/remoteproc/qcom_q6v5_pas.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/drivers/remoteproc/qcom_q6v5_pas.c b/drivers/remoteproc/qcom_q6v5_pas.c
+index 8cff0684f..9df4f1efa 100644
+--- a/drivers/remoteproc/qcom_q6v5_pas.c
++++ b/drivers/remoteproc/qcom_q6v5_pas.c
+@@ -1247,6 +1247,7 @@ static const struct qcom_pas_data x1e80100_adsp_resource = {
+ 	.lite_dtb_pas_id = 0x29,
+ 	.minidump_id = 5,
+ 	.auto_boot = true,
++	.early_boot = true,
+ 	.proxy_pd_names = (char*[]){
+ 		"lcx",
+ 		"lmx",
+@@ -1266,6 +1267,7 @@ static const struct qcom_pas_data x1e80100_cdsp_resource = {
+ 	.dtb_pas_id = 0x25,
+ 	.minidump_id = 7,
+ 	.auto_boot = true,
++	.early_boot = true,
+ 	.proxy_pd_names = (char*[]){
+ 		"cx",
+ 		"mxc",
+-- 
+2.56.0
+
