@@ -117,3 +117,30 @@ WARN IPAProxy Configuration file 'ov13858.yaml' not found for IPA module 'simple
 travers une capture** `cam` sur le flux brut. Utile pour ce genre de mesure, mais il faut
 **restaurer les valeurs ensuite** : vérifié après coup par une capture normale
 (`1920x1092-ABGR8888/sRGB`, 30 img/s).
+
+## Expérience proposée par Barnabás Pőcze : la consigne du pilote fixe le noir (2026-10-03)
+
+Réponse du mainteneur (02/10/2026, `<72cbf66f-754a-423b-aee0-a253121ee7d5@ideasonboard.com>`) :
+le code du helper est jugé correct, et les valeurs concordent avec patchwork 28174.
+Pőcze relève que le pilote programme `{0x4002, 0x00}, {0x4003, 0x40}`, les registres
+BLC CTRL 02/03 d'autres capteurs OmniVision, et propose de passer `0x40` à `0x80` pour voir
+si la mesure suit.
+
+Protocole, sans reconstruire le pilote (`ov02c10` est tenu par camss, refcount 3) :
+écriture I²C directe pendant la prise de vue, sur le bus `Qualcomm-CCI` `/dev/i2c-1`,
+adresse `0x36`, avec
+`i2ctransfer -f -y 1 w3@0x36 0x40 0x03 0x80`. Lecture préalable en prise de vue : `0x40`.
+`cam -c 1 -s role=raw -C150`, objectif avant masqué, écriture à t = 1,5 s, relue `0x80`.
+
+| image | t / écriture | moyenne (10 bits) |
+|---|---|---|
+| 0 à 40 | −1,32 à 0,00 s | **64,19 à 64,20** |
+| 41 et suivantes | +0,04 s à +3,5 s | **128,18 à 128,19** |
+
+Par canal (images 20 et 100) : Gr 64,20 → 128,18 ; R 64,77 → 128,74 ; B 64,13 → 128,12 ;
+Gb 64,19 → 128,18. **+64 sur les quatre canaux**, effet dès l'image suivante, écart-type
+inchangé (0,54 à 0,73). Le niveau de noir mesuré **est** la consigne BLC programmée par le
+pilote. À la prise de vue suivante, le pilote réécrit sa table et relit `0x40` : rien
+n'est modifié durablement. Images témoins :
+`mesures/ov02c10-trame-noire-blc0x40-20261003.bin` et `…-blc0x80-20261003.bin` ;
+journal `mesures/ov02c10-blc-experience-cam-20261003.log`.
