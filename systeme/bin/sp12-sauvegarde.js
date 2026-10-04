@@ -61,7 +61,7 @@ function archiver(nom, racine, args) {
   const t0 = Date.now();
   const r = spawnSync('tar', [
     '--numeric-owner', '--acls', '--xattrs', '--one-file-system',
-    '-I', 'zstd -T0 -3',
+    '-I', 'zstd -T3 -3',            // 3 cœurs : tablette sans ventilateur
     ...args, '-cpf', sortie, '-C', racine, '.',
   ], { stdio: ['ignore', 'ignore', 'pipe'], encoding: 'utf8' });
 
