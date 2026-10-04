@@ -23,7 +23,10 @@ const EXCLURE = [
   '/lost+found',
 ];
 
-fs.mkdirSync(DEST, { recursive: true });
+// L’archive contient /etc entier (shadow, mots de passe WiFi, clé Tailscale) : root seul.
+process.umask(0o077);
+fs.mkdirSync(DEST, { recursive: true, mode: 0o700 });
+fs.chmodSync(path.dirname(DEST), 0o700);
 const journal = (s) => { console.log(s); fs.appendFileSync(`${DEST}/journal.txt`, s + '\n'); };
 
 journal(`>> instantané SP12 -> ${DEST}`);
