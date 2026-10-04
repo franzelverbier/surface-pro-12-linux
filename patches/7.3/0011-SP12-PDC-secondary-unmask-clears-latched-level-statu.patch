@@ -1,0 +1,133 @@
+From 9135956d1a320f879fd3fe6be139359d3aeefce7 Mon Sep 17 00:00:00 2001
+From: "Claude (SP12)" <info@humanlearning.ch>
+Date: Sun, 4 Oct 2026 11:03:16 +0200
+Subject: [PATCH] SP12: PDC secondary unmask clears latched level status;
+ pwrkey reports wake press as KEY_WAKEUP
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ drivers/input/misc/pm8941-pwrkey.c | 52 ++++++++++++++++++++++++++++--
+ drivers/irqchip/qcom-pdc.c         | 12 +++++++
+ 2 files changed, 62 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/input/misc/pm8941-pwrkey.c b/drivers/input/misc/pm8941-pwrkey.c
+index 53249d2c0..cedc195eb 100644
+--- a/drivers/input/misc/pm8941-pwrkey.c
++++ b/drivers/input/misc/pm8941-pwrkey.c
+@@ -82,8 +82,15 @@ struct pm8941_pwrkey {
+ 	ktime_t sw_debounce_end_time;
+ 	bool last_status;
+ 	const struct pm8941_data *data;
++
++	/* Press that woke the system, reported as KEY_WAKEUP */
++	bool wake_armed;
++	bool wake_key_down;
++	ktime_t wake_window_end;
+ };
+ 
++#define PM8941_WAKE_WINDOW_MS	1500
++
+ static int pm8941_reboot_notify(struct notifier_block *nb,
+ 				unsigned long code, void *unused)
+ {
+@@ -171,6 +178,40 @@ static irqreturn_t pm8941_pwrkey_irq(int irq, void *_data)
+ 		pwrkey->sw_debounce_end_time = ktime_add_us(ktime_get(),
+ 						pwrkey->sw_debounce_time_us);
+ 
++	/*
++	 * The press that woke the system is delivered once it is running
++	 * again. Reported as KEY_POWER, userspace takes it as a new suspend
++	 * request and puts the system straight back to sleep. Report it as
++	 * KEY_WAKEUP instead: it still counts as user activity.
++	 */
++	if (pwrkey->wake_armed && pwrkey->wake_window_end &&
++	    ktime_after(ktime_get(), pwrkey->wake_window_end))
++		pwrkey->wake_armed = false;
++
++	if (pwrkey->wake_armed && (sts || !pwrkey->last_status)) {
++		pwrkey->wake_armed = false;
++		input_report_key(pwrkey->input, KEY_WAKEUP, 1);
++		input_sync(pwrkey->input);
++		if (sts) {
++			pwrkey->wake_key_down = true;
++		} else {
++			input_report_key(pwrkey->input, KEY_WAKEUP, 0);
++			input_sync(pwrkey->input);
++		}
++		pwrkey->last_status = sts;
++		return IRQ_HANDLED;
++	}
++
++	if (pwrkey->wake_key_down) {
++		if (!sts) {
++			pwrkey->wake_key_down = false;
++			input_report_key(pwrkey->input, KEY_WAKEUP, 0);
++			input_sync(pwrkey->input);
++		}
++		pwrkey->last_status = sts;
++		return IRQ_HANDLED;
++	}
++
+ 	/*
+ 	 * Simulate a press event in case a release event occurred without a
+ 	 * corresponding press event.
+@@ -224,8 +265,11 @@ static int pm8941_pwrkey_suspend(struct device *dev)
+ {
+ 	struct pm8941_pwrkey *pwrkey = dev_get_drvdata(dev);
+ 
+-	if (device_may_wakeup(dev))
++	if (device_may_wakeup(dev)) {
+ 		enable_irq_wake(pwrkey->irq);
++		pwrkey->wake_armed = true;
++		pwrkey->wake_window_end = 0;
++	}
+ 
+ 	return 0;
+ }
+@@ -234,8 +278,11 @@ static int pm8941_pwrkey_resume(struct device *dev)
+ {
+ 	struct pm8941_pwrkey *pwrkey = dev_get_drvdata(dev);
+ 
+-	if (device_may_wakeup(dev))
++	if (device_may_wakeup(dev)) {
+ 		disable_irq_wake(pwrkey->irq);
++		pwrkey->wake_window_end = ktime_add_ms(ktime_get(),
++						       PM8941_WAKE_WINDOW_MS);
++	}
+ 
+ 	return 0;
+ }
+@@ -334,6 +381,7 @@ static int pm8941_pwrkey_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	input_set_capability(pwrkey->input, EV_KEY, pwrkey->code);
++	input_set_capability(pwrkey->input, EV_KEY, KEY_WAKEUP);
+ 
+ 	pwrkey->input->name = pwrkey->data->name;
+ 	pwrkey->input->phys = pwrkey->data->phys;
+diff --git a/drivers/irqchip/qcom-pdc.c b/drivers/irqchip/qcom-pdc.c
+index ce6d80c7f..07ce2d021 100644
+--- a/drivers/irqchip/qcom-pdc.c
++++ b/drivers/irqchip/qcom-pdc.c
+@@ -333,6 +333,18 @@ static void qcom_pdc_secondary_mask(struct irq_data *d)
+ 
+ static void qcom_pdc_secondary_unmask(struct irq_data *d)
+ {
++	/*
++	 * A level interrupt is EOI'd before its threaded handler has serviced
++	 * the device, so the line can still be asserted then and the status
++	 * latches again right after the clear. Some devices (ELAN i2c-hid
++	 * touchscreens) also pulse their line after each read. Either way the
++	 * stale status is still set once the handler is done, and unmasking
++	 * replays it forever. Clear it while still masked: if the line really
++	 * is asserted, the PDC latches it again at once.
++	 */
++	if (irqd_is_level_type(d))
++		pdc->clear_gpio(d->hwirq);
++
+ 	pdc->enable_intr(d->hwirq, true);
+ 	pdc->unmask_gpio(d->hwirq, true);
+ 	irq_chip_unmask_parent(d);
+-- 
+2.56.0
+
