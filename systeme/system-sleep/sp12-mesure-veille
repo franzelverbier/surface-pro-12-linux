@@ -1,0 +1,5 @@
+#!/bin/sh
+# SP12 — relève énergie et qcom_stats à chaque veille et réveil ($1 = pre|post).
+# Ne bloque jamais la veille : erreurs ignorées. Bilan : node /usr/local/lib/sp12/sp12-mesure-veille.js bilan
+[ "$2" = suspend ] || exit 0
+/usr/bin/node /usr/local/lib/sp12/sp12-mesure-veille.js "$1" >/dev/null 2>&1 || true
