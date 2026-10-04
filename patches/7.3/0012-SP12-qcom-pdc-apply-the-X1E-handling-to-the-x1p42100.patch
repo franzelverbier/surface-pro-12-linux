@@ -1,0 +1,32 @@
+From 98e400bf3b06aff9564400775f4533e6a4223985 Mon Sep 17 00:00:00 2001
+From: "Claude (SP12)" <info@humanlearning.ch>
+Date: Sun, 4 Oct 2026 11:10:17 +0200
+Subject: [PATCH] SP12: qcom-pdc: apply the X1E handling to the x1p42100-pdc
+ compatible
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ drivers/irqchip/qcom-pdc.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/irqchip/qcom-pdc.c b/drivers/irqchip/qcom-pdc.c
+index 07ce2d021..0dfa88ed2 100644
+--- a/drivers/irqchip/qcom-pdc.c
++++ b/drivers/irqchip/qcom-pdc.c
+@@ -718,7 +718,12 @@ static int qcom_pdc_probe(struct platform_device *pdev, struct device_node *pare
+ 	 * a different client and is not described in the device tree. Map the
+ 	 * region with the expected offset to preserve support for old DTs.
+ 	 */
+-	if (of_device_is_compatible(node, "qcom,x1e80100-pdc")) {
++	/*
++	 * Purwa (X1P42100) has the same PDC. Older Purwa DTs, such as the one the
++	 * Surface Pro 12 boots at EL2, name it "qcom,x1p42100-pdc" only.
++	 */
++	if (of_device_is_compatible(node, "qcom,x1e80100-pdc") ||
++	    of_device_is_compatible(node, "qcom,x1p42100-pdc")) {
+ 		pdc->prev_base = devm_ioremap(dev, res.start - PDC_DRV_SIZE,
+ 					      pdc->regs->irq_en_reg + IRQ_ENABLE_BANK_MAX);
+ 		if (!pdc->prev_base) {
+-- 
+2.56.0
+
