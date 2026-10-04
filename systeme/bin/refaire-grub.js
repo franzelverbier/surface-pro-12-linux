@@ -73,8 +73,18 @@ const vers73El2Juin = corps => corps.map(l => {
 const garder = [
   [null, null, '═══ AU QUOTIDIEN ═══'],
 
+  ['mainline-73-el2', 'mainline-73-el2-juin',
+   "SP12 — 7.3 en EL2 : KVM + son + caméras + veille + écran USB-C  ← DÉFAUT",
+   ["DÉFAUT DEPUIS LE 04/10/2026. Noyau 7.3-rc3 + patches/7.3 0001-0012 avec le DTB",
+    "de juin + caméras. EL2+KVM, ADSP+CDSP rattachés, son, batterie, 2 caméras,",
+    "veille s2idle tenue 4 h 13 (PDC Purwa, KEY_WAKEUP, tactile retiré des réveils,",
+    "ath12k déchargé), écran externe en USB-C direct sur le port A.",
+    "⚠️ Ne pas débrancher un écran externe qui n'a pas réussi à s'allumer : plantage.",
+    "Config dans kernel/config-7.3.0-rc3-mainline-el2 ; rebâtir avec LOCALVERSION=."],
+   vers73El2Juin],
+
   ['courant', 'el2-cam',
-   "SP12 — usage courant + caméras  (EL2 + KVM + son)  ← DÉFAUT",
+   "SP12 — noyau -nft + caméras  (EL2 + KVM + son)  ← l'ancien défaut",
    ["Tout à la fois : le DTB de juin, qui démarre en EL2 depuis le 11/09, avec les",
     "caméras GREFFÉES par overlay (systeme/bin/greffer-cameras.js,",
     "dts/cameras-greffe.dtso). Veille s2idle active depuis le 30/09 (~1,3 W).",
@@ -94,17 +104,6 @@ const garder = [
     "atteint. À vérifier : /dev/kvm, écran, WiFi, DSP (le 7.3 sait-il s'y rattacher",
     "en EL2 ?). Écran noir : maintenir le bouton marche, l'entrée 1 démarre ensuite."],
    vers73El2],
-
-  ['mainline-73-el2', 'mainline-73-el2-juin',
-   "SP12 — 7.3 en EL2 : KVM + son + caméras + batterie  (candidat au quotidien)",
-   ["Le 03/10, le 7.3 avec le DTB EL2 amont a fait défiler du texte un bon moment,",
-    "puis écran noir (bouton maintenu ; rien dans le journal ni pstore, UFS en module).",
-    "Ici le même noyau avec le DTB de juin qui marche en EL2 sous -nft.",
-    "Démarre = le DTS amont est en cause en EL2. Noir = c'est le noyau 7.3 en EL2.",
-    "RÉSULTAT (03/10) : démarre. Avec patches/7.3 0001-0010 (QoS, attache DSP, SMP2P,",
-    "caméras) : EL2+KVM, ADSP+CDSP rattachés, son, batterie, 2 caméras à 30 img/s.",
-    "Plus de garde-fou ; config dans kernel/config-7.3.0-rc3-mainline-el2."],
-   vers73El2Juin],
 
   ['mainline-73-dsp', 'mainline-73-dsp',
    "SP12 — essai : mainline 7.3 en EL1  (son à finir, WiFi 2161 Mbit/s)",
@@ -142,11 +141,10 @@ const entete = `# Surface Pro 12 (x1p42100) — menu de démarrage
 # noyaux, initramfs et DTB correspondants sont toujours dans /boot.
 # RIEN N'A ÉTÉ SUPPRIMÉ DU DISQUE : remettre une entrée = recopier son bloc.
 #
-# DÉFAUT DEPUIS LE 16/09/2026 : el2-cam. Elle fait tout ce que faisait « courant »
-# (EL2, KVM, audio, réseau) et y ajoute les deux caméras, greffées par overlay sur le
-# même DTB de juin. Vérifié au démarrage de 17:49 : /dev/kvm, une carte son, 12 nœuds
-# video, CMA 524288 kB, zéro oops, capture 4216x3136 à 30 img/s sans sudo.
-# En cas de doute, « usage courant » reste intacte, juste en dessous.
+# DÉFAUT DEPUIS LE 04/10/2026 : mainline-73-el2-juin (7.3 en EL2, DTB de juin +
+# caméras). Il fait tout ce que faisait el2-cam et y ajoute la veille qui tient
+# (4 h 13 le 04/10) et l'écran externe en USB-C. En cas de doute, el2-cam (noyau
+# -nft, défaut du 16/09 au 04/10) est juste en dessous, inchangée.
 #
 # ⚠️ LE DÉFAUT EST DÉSIGNÉ PAR IDENTIFIANT, PAS PAR NUMÉRO. Ajouter ou retirer
 # une entrée ne peut donc pas changer ce qui démarre. GRUB compte à partir de 0
@@ -167,13 +165,13 @@ const entete = `# Surface Pro 12 (x1p42100) — menu de démarrage
 # qui les utilise doit porter modprobe.blacklist=qcom_q6v5_pas.
 
 set timeout=5
-set default=el2-cam
+set default=mainline-73-el2-juin
 
 # Police agrandie — l'écran fait 2196 px de large et la police par défaut de
 # GRUB y est minuscule. TOUT EST CONDITIONNEL : si l'image GRUB n'a pas ces
 # modules ou si le fichier manque, le menu s'affiche exactement comme avant.
 # Et même si l'affichage échouait complètement, le délai de 5 s démarre de
-# toute façon l'entrée « el2-cam » : cette machine ne peut pas rester bloquée
+# toute façon l'entrée par défaut : cette machine ne peut pas rester bloquée
 # sur un menu invisible.
 if search --no-floppy --set=fontroot --label SP12ROOT-INT ; then
     if loadfont ($fontroot)/boot/grub/fonts/sp12-36.pf2 ; then
