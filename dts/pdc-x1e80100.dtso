@@ -1,0 +1,18 @@
+// SPDX-License-Identifier: BSD-3-Clause
+/*
+ * SP12 — le DTB de juin nomme le PDC « qcom,x1p42100-pdc », que le pilote 7.3
+ * ne reconnaît pas comme X1E : pas de bascule SCM en passage direct, pas de
+ * contournement de la région DRV précédente, et le verrou de niveau du GPIO 38
+ * (tactile) rejoue l'interruption sans fin (~1 150 IRQ/s, réveil immédiat en
+ * veille). Le DTS amont (purwa.dtsi hérite de hamoa.dtsi) l'appelle
+ * « qcom,x1e80100-pdc » : on reprend exactement cette chaîne. Remplace le patch
+ * noyau 0012. Audit §49 undecies.
+ *
+ * fdtoverlay -i sp12-el2-cam.dtb -o sp12-el2-cam-pdc.dtb pdc-x1e80100.dtbo
+ */
+/dts-v1/;
+/plugin/;
+
+&pdc {
+	compatible = "qcom,x1e80100-pdc", "qcom,pdc";
+};

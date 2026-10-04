@@ -58,8 +58,10 @@ const vers73El2 = corps => corps.map(l => {
 // démarre en EL2 avec -nft. Même noyau 7.3 que mainline-73-el2, seul le DTB change :
 // démarre -> c'est le DTS amont en EL2 ; écran noir -> c'est le noyau 7.3 en EL2.
 // loglevel=7 pour voir où ça s'arrête.
+// 04/10 : DTB sp12-el2-cam-pdc.dtb = sp12-el2-cam.dtb + dts/pdc-x1e80100.dtso (le PDC
+// porte le nom amont « qcom,x1e80100-pdc ») ; remplace le patch noyau 0012.
 const vers73El2Juin = corps => corps.map(l => {
-  if (l.startsWith('    devicetree ')) return '    devicetree /boot/sp12-el2-cam.dtb';
+  if (l.startsWith('    devicetree ')) return '    devicetree /boot/sp12-el2-cam-pdc.dtb';
   if (l.startsWith('    linux ')) return l.replace('/boot/Image-7.3rc3-qos ', '/boot/Image-7.3rc3-el2 ').replace(' sp12.autoreboot=600', '');
   return l;
 });
