@@ -67,6 +67,16 @@ const vers73El2Juin = corps => corps.map(l => {
 // série « attach » (dont « Take over outgoing SMEM items from boot firmware ») :
 // l'ADSP, que l'UEFI sollicite pour la charge, ne levait pas son « ready » sous 7.3.
 
+// Secours figé du 04/10/2026 : le corps du défaut 7.3, avec des fichiers datés
+// (Image, initramfs, DTB) et loglevel=7. Le noyau porte la version
+// 7.3.0-rc3-mainline-secours et son propre arbre de modules.
+const versSecours = corps => corps.map(l => {
+  if (l.startsWith('    devicetree ')) return '    devicetree /boot/sp12-secours-20261004.dtb';
+  if (l.startsWith('    initrd ')) return '    initrd /boot/initramfs-secours-20261004.img';
+  if (l.startsWith('    linux ')) return l.replace(/\/boot\/Image-7\.3rc3-el2 /, '/boot/Image-secours-20261004 ').replace(' loglevel=4 ', ' loglevel=7 ');
+  return l;
+});
+
 // --- ce qu'on garde, dans l'ordre d'affichage voulu -------------------------
 // ['motif de titre' | null, id, titre, [commentaires], transform?]
 // Un motif null introduit un séparateur de groupe.
@@ -123,10 +133,14 @@ const garder = [
    "SP12 — secours EL1 : DTS amont, caméras + audio + RTC  (démarrage lent)",
    ["Le plus complet en EL1, sur le noyau -nft. Pas de KVM ; 18,9 s jusqu'au bureau."]],
 
-  ['secours', 'secours',
-   "SP12 — secours figé du 20 août  (verbeux)",
-   ["Jeu figé et vérifié octet par octet, que rien ne réécrit. loglevel=7.",
-    "⚠️ Partage l'arbre de modules -nft avec l'entrée courante."]],
+  ['mainline-73-el2-juin', 'secours',
+   "SP12 — secours figé du 4 octobre  (7.3, verbeux)",
+   ["Le défaut du 04/10 figé : même source et même config que mainline-73-el2-juin,",
+    "bâti avec LOCALVERSION=-secours, donc SES PROPRES modules",
+    "(/lib/modules/7.3.0-rc3-mainline-secours) : rebâtir le noyau du quotidien ne",
+    "peut pas le casser. Image, initramfs et DTB datés, que rien ne réécrit. loglevel=7.",
+    "Remplace le secours du 20 août (fichiers .good-2026-08-20 restés dans /boot)."],
+   versSecours],
 
   ['shell', 'shell',
    "SP12 — Shell UEFI  (diagnostic)", []],
