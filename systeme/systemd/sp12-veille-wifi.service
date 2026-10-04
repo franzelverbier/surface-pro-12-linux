@@ -4,6 +4,13 @@
 # et le recharger au réveil refait la séquence de sonde, qui marche (vérifié : 1730
 # Mbit/s après rechargement). Inutile sous -nft, où la reprise fonctionne : la
 # condition sur la version de noyau l'écarte.
+#
+# 04/10/2026 : modprobe rend la main avant la fin de la sonde (le firmware démarre
+# ensuite par MHI). L'appui sur le bouton qui réveille la machine est aussi reçu
+# par PowerDevil comme une demande de veille : la veille suivante démarrait 50 ms
+# après le réveil, et le modprobe -r tombait en plein démarrage du firmware. La
+# machine s'est figée (journal arrêté sur « chip_id » ; 10:03:57). On attend donc
+# que wlan0 existe, au réveil comme avant de décharger, 20 s au plus.
 [Unit]
 Description=SP12 - Décharger le WiFi ath12k pendant la veille (noyau >= 7.3)
 Before=sleep.target
@@ -13,8 +20,11 @@ ConditionKernelVersion=>=7.3
 [Service]
 Type=oneshot
 RemainAfterExit=yes
+TimeoutSec=60
+ExecStart=-/bin/sh -c 'if [ -d /sys/module/ath12k_wifi7 ]; then i=0; while [ ! -e /sys/class/net/wlan0 ] && [ $i -lt 40 ]; do sleep 0.5; i=$((i+1)); done; fi'
 ExecStart=-/usr/bin/modprobe -r ath12k_wifi7
 ExecStop=-/usr/bin/modprobe ath12k_wifi7
+ExecStop=-/bin/sh -c 'i=0; while [ ! -e /sys/class/net/wlan0 ] && [ $i -lt 40 ]; do sleep 0.5; i=$((i+1)); done; sleep 1'
 
 [Install]
 WantedBy=sleep.target

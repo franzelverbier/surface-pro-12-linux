@@ -1,0 +1,22 @@
+# SP12 — 04/10/2026 : sous 7.3, l'écran tactile Elan 04F3:4377 (hid-over-i2c,
+# GPIO 38, niveau bas, « wakeup-source » dans le DTB) ne répond plus à la commande
+# de mise en sommeil (« failed to change power setting », -ENXIO) et sa ligne
+# d'interruption s'emballe (~1170 IRQ/s à l'arrêt, aucun événement d'entrée).
+# PM_DEBUG : « Triggering wakeup from IRQ 219 » pendant la phase noirq, donc la
+# veille avorte au bout de 0,2 s ; PowerDevil rendort 10 s plus tard, et la nuit
+# du 03/10 a fini figée au 99e cycle. Retirer le tactile des sources de réveil :
+# son IRQ est alors masquée pendant la veille et i2c-hid coupe son alimentation.
+# Le bouton et le clavier du cover réveillent toujours. Inutile sous -nft.
+[Unit]
+Description=SP12 - Retirer l'écran tactile des sources de réveil (noyau >= 7.3)
+Before=sleep.target
+StopWhenUnneeded=yes
+ConditionKernelVersion=>=7.3
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=-/bin/sh -c 'for f in /sys/bus/i2c/drivers/i2c_hid_of/*-0016/power/wakeup; do echo disabled > "$f"; done'
+
+[Install]
+WantedBy=sleep.target
