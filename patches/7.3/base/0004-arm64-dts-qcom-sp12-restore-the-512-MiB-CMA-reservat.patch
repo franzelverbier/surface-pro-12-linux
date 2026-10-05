@@ -1,0 +1,53 @@
+From 5fce1eeccb4dc05a69d7951558d25b5cff1b42a5 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Fran=C3=A7ois=20Roux?= <info@humanlearning.ch>
+Date: Wed, 16 Sep 2026 16:41:30 +0200
+Subject: [PATCH 4/4] arm64: dts: qcom: sp12: restore the 512 MiB CMA
+ reservation
+
+The Gentoo overlay's board patch 0015 deletes the reserved-memory linux,cma node.
+CyberMyth's shipped device tree keeps it, at 512 MiB, and that is the tree known
+to work on this machine. Without the node only the kernel default of 32 MiB is
+left, the display consumes it, and libcamera fails on the very first frame:
+
+	ERROR DmaBufAllocator: dma-heap allocation failure for frame-0
+	CmaTotal: 32768 kB    CmaFree: 184 kB
+
+Restored verbatim. This replaces the cma=256M command-line workaround, now
+removed from every GRUB entry.
+
+Assisted-by: Claude:claude-opus-5
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+---
+ .../boot/dts/qcom/x1p42100-microsoft-sp12in.dts  | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/qcom/x1p42100-microsoft-sp12in.dts b/arch/arm64/boot/dts/qcom/x1p42100-microsoft-sp12in.dts
+index 6218a01b1..30e33b92d 100644
+--- a/arch/arm64/boot/dts/qcom/x1p42100-microsoft-sp12in.dts
++++ b/arch/arm64/boot/dts/qcom/x1p42100-microsoft-sp12in.dts
+@@ -182,6 +182,22 @@ pmic_glink_ss1_sbu: endpoint {
+ 		};
+ 	};
+ 
++	reserved-memory {
++		/*
++		 * Retablie le 2026-09-16. Le correctif 0015 de l overlay Gentoo
++		 * supprime ce noeud ; le device tree livre par CyberMyth le garde, et
++		 * sans lui il ne reste que les 32 Mio par defaut de la configuration
++		 * noyau, que l affichage consomme entierement : libcamera echoue alors
++		 * sur « dma-heap allocation failure » des la premiere image.
++		 */
++		linux,cma {
++			compatible = "shared-dma-pool";
++			size = <0x0 0x20000000>;
++			reusable;
++			linux,cma-default;
++		};
++	};
++
+ 	vreg_edp_3p3: regulator-edp-3p3 {
+ 		compatible = "regulator-fixed";
+ 
+-- 
+2.56.0
+
