@@ -138,13 +138,14 @@ const garder = [
    versReposProfond73],
 
   ['mainline-73-el2-juin', 'repos-profond-cx',
-   "SP12 — essai : 7.3 + SS3 sans clk/pd_ignore_unused  (damier possible)",
-   ["Comme repos-profond, sans clk_ignore_unused ni pd_ignore_unused : leurs horloges et",
-    "domaines gardés allumés votent pour CX. Le 06/10, en EL2 comme en EL1, cxsd reste à 0.",
-    "⚠️ Damier à l'écran 2 fois sur 3 (course clk_disable_unused / msm, §47 quater) :",
-    "redémarrer sur la même entrée jusqu'à un écran propre, ou revenir à l'entrée 1."],
+   "SP12 — essai : 7.3 + SS3 sans pd_ignore_unused  (repos profond)",
+   ["Comme repos-profond, sans pd_ignore_unused (clk_ignore_unused gardé : le damier vient",
+    "des horloges, §47 quater ; essai sans les deux le 06/10 : damier). Trois GDSC sans",
+    "consommateur restent allumés à vie avec pd_ignore_unused (usb_2_phy, usb3_mp_ss0/ss1_phy) :",
+    "le genpd ne les éteint pas en veille, et ils tiennent CX. En 7.3, le genpd garde les",
+    "domaines allumés jusqu'au sync_state de leur fournisseur, puis éteint les inutilisés."],
    corps => versReposProfond73(corps).map(l => l.startsWith('    linux ')
-     ? l.replace(' clk_ignore_unused', '').replace(' pd_ignore_unused', '') : l)],
+     ? l.replace(' pd_ignore_unused', '') : l)],
 
   [null, null, '═══ SECOURS ═══'],
 
