@@ -137,6 +137,15 @@ const garder = [
     "PDC (§48 ter), que le 7.3 a, et dont le passage direct marche depuis le DTB PDC du 04/10."],
    versReposProfond73],
 
+  ['mainline-73-el2-juin', 'repos-profond-cx',
+   "SP12 — essai : 7.3 + SS3 sans clk/pd_ignore_unused  (damier possible)",
+   ["Comme repos-profond, sans clk_ignore_unused ni pd_ignore_unused : leurs horloges et",
+    "domaines gardés allumés votent pour CX. Le 06/10, en EL2 comme en EL1, cxsd reste à 0.",
+    "⚠️ Damier à l'écran 2 fois sur 3 (course clk_disable_unused / msm, §47 quater) :",
+    "redémarrer sur la même entrée jusqu'à un écran propre, ou revenir à l'entrée 1."],
+   corps => versReposProfond73(corps).map(l => l.startsWith('    linux ')
+     ? l.replace(' clk_ignore_unused', '').replace(' pd_ignore_unused', '') : l)],
+
   [null, null, '═══ SECOURS ═══'],
 
   ['amont-el1-nft', 'amont-el1-nft',
