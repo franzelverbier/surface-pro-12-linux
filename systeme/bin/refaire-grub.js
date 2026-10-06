@@ -79,6 +79,10 @@ const versSecours = corps => corps.map(l => {
   return l;
 });
 
+// Repos profond sous 7.3 (06/10) : le défaut, avec l'état système SS3 en plus.
+const versReposProfond73 = corps => corps.map(l => l.startsWith('    devicetree ')
+  ? '    devicetree /boot/sp12-el2-cam-pdc-ss3.dtb' : l);
+
 // --- ce qu'on garde, dans l'ordre d'affichage voulu -------------------------
 // ['motif de titre' | null, id, titre, [commentaires], transform?]
 // Un motif null introduit un séparateur de groupe.
@@ -123,11 +127,12 @@ const garder = [
     "redémarre au lieu de se rattacher et plante une fois (charger_process) ;",
     "ALSA joue, WirePlumber ne relie pas les flux. Pas de KVM."]],
 
-  ['repos-profond', 'repos-profond',
-   "SP12 — essai : el2-cam + état système SS3  (retour auto 10 min)",
-   ["el2-cam avec l'état de repos « système » SS3 : l'APSS dort au repos ordinaire.",
-    "En veille, le firmware rend la main aussitôt en EL2 ; le vrai repos profond",
-    "demande un noyau ≥ 7.3 (série PDC, audit §48 ter)."]],
+  ['mainline-73-el2-juin', 'repos-profond',
+   "SP12 — essai : 7.3 + état système SS3  (repos profond)",
+   ["Le défaut 7.3 avec sp12-el2-cam-pdc-ss3.dtb = sp12-el2-cam-pdc.dtb + dts/etat-systeme-ss3.dtso.",
+    "Sous -nft (01-02/10) le firmware rendait la main aussitôt en EL2 ; il manquait la série",
+    "PDC (§48 ter), que le 7.3 a, et dont le passage direct marche depuis le DTB PDC du 04/10."],
+   versReposProfond73],
 
   [null, null, '═══ SECOURS ═══'],
 

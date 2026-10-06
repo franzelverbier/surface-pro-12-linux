@@ -36,8 +36,15 @@ function releve(phase) {
       duree: Number((x.match(/Accumulated Duration:\s*(\d+)/) || [])[1] ?? NaN),
     };
   }
+  // Domaine « système » : Time(ms) est le temps réellement passé dans l'état ; Usage
+  // compte aussi les tentatives que le firmware rend aussitôt (audit §48 ter).
+  const genpd = {};
+  for (const l of lire('/sys/kernel/debug/pm_genpd/power-domain-system/idle_states').split('\n').slice(1)) {
+    const c = l.trim().split(/\s+/);
+    if (c.length >= 7) genpd[c[0]] = { temps_ms: +c[1], usage: +c[2], refus: +c[3], s2idle: +c[6] };
+  }
   return {
-    phase, t: Date.now(),
+    phase, t: Date.now(), genpd,
     energie_uWh: Number(bat.ENERGY_NOW), energie_pleine_uWh: Number(bat.ENERGY_FULL),
     statut: bat.STATUS, puissance_uW: Number(bat.POWER_NOW),
     noyau: lire('/proc/sys/kernel/osrelease').trim(),
@@ -62,6 +69,7 @@ function bilan() {
       h > 0 ? `${(wh / h).toFixed(2)} W` : '—',
       `${(100 * (a.energie_uWh - b.energie_uWh) / a.energie_pleine_uWh / h).toFixed(1)} %/h`,
       `cxsd+${delta('cxsd')} aosd+${delta('aosd')} ddr+${delta('ddr')}`,
+      Object.keys(b.genpd || {}).map(k => `${k} ${(((b.genpd[k].temps_ms - ((a.genpd || {})[k] || {}).temps_ms) || 0) / 1000).toFixed(0)} s / s2idle+${b.genpd[k].s2idle - (((a.genpd || {})[k] || {}).s2idle || 0)}`).join(', ') || 'genpd ?',
       (secteur ? 'SECTEUR, à écarter ' : '') + (h < 0.5 ? 'courte, peu fiable' : ''),
       a.noyau,
     ].join(' | '));
