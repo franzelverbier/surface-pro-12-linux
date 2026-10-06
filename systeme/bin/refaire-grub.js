@@ -83,11 +83,11 @@ const versSecours = corps => corps.map(l => {
 });
 
 // Repos profond sous 7.3 (06/10) : le défaut, avec l'état système SS3 en plus.
-// 06/10 : avec Image-7.3rc3-el2-rsc = le défaut + correctif rpmh-rsc (échéance de réveil
-// périmée en s2idle), à l'essai avant de passer au quotidien.
+// 06/10 : essayé avec Image-7.3rc3-el2-rsc (correctif rpmh-rsc) : sans effet, X1E n'a pas
+// de CONTROL_TCS (§54 bis). Revenu à l'image du quotidien.
 const versReposProfond73 = corps => corps.map(l => {
   if (l.startsWith('    devicetree ')) return '    devicetree /boot/sp12-el2-cam-pdc-ss3.dtb';
-  if (l.startsWith('    linux ')) return l.replace('/boot/Image-7.3rc3-el2 ', '/boot/Image-7.3rc3-el2-rsc ');
+  if (l.startsWith('    linux ')) return l.replace('/boot/Image-7.3rc3-el2-rsc ', '/boot/Image-7.3rc3-el2 ');
   return l;
 });
 
