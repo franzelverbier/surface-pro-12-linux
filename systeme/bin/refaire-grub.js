@@ -62,7 +62,10 @@ const vers73El2 = corps => corps.map(l => {
 // porte le nom amont « qcom,x1e80100-pdc ») ; remplace le patch noyau 0012.
 const vers73El2Juin = corps => corps.map(l => {
   if (l.startsWith('    devicetree ')) return '    devicetree /boot/sp12-el2-cam-pdc.dtb';
-  if (l.startsWith('    linux ')) return l.replace('/boot/Image-7.3rc3-qos ', '/boot/Image-7.3rc3-el2 ').replace(' sp12.autoreboot=600', '');
+  if (l.startsWith('    linux ')) return l.replace('/boot/Image-7.3rc3-qos ', '/boot/Image-7.3rc3-el2 ').replace(' sp12.autoreboot=600', '')
+    // 06/10 : sous 7.3, pstore_blk ne trouve pas l'UFS (module) et bloque ramoops ;
+    // ramoops (réservé dans le DTB, 1 Mio) garde la console à travers un redémarrage brutal.
+    .replace(' pstore.backend=pstore_blk', ' pstore.backend=ramoops');
   return l;
 });
 // Image-7.3rc3-el2 (03/10, 18:05) = Image-7.3rc3-qos + correctifs SMP2P 0003-0008 de la
