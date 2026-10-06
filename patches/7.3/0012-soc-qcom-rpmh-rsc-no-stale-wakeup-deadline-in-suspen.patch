@@ -1,0 +1,64 @@
+From f919b20b91f7d70ce65eeb6da22a466ffa940f0a Mon Sep 17 00:00:00 2001
+From: "Claude (SP12)" <info@humanlearning.ch>
+Date: Tue, 6 Oct 2026 11:57:50 +0200
+Subject: [PATCH] soc: qcom: rpmh-rsc: no stale wakeup deadline in
+ suspend-to-idle
+
+In s2idle the cluster domain is powered off through dev_pm_genpd_suspend(),
+which skips the genpd governor, so next_hrtimer is stale and in the past.
+The negative difference becomes an arbitrary u64 deadline. Write the
+maximum wakeup in s2idle and whenever the deadline is not in the future.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ drivers/soc/qcom/rpmh-rsc.c | 21 ++++++++++++++++++---
+ 1 file changed, 18 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/soc/qcom/rpmh-rsc.c b/drivers/soc/qcom/rpmh-rsc.c
+index f881af35e..ff0e35275 100644
+--- a/drivers/soc/qcom/rpmh-rsc.c
++++ b/drivers/soc/qcom/rpmh-rsc.c
+@@ -24,6 +24,7 @@
+ #include <linux/pm_domain.h>
+ #include <linux/pm_runtime.h>
+ #include <linux/slab.h>
++#include <linux/suspend.h>
+ #include <linux/spinlock.h>
+ #include <linux/wait.h>
+ 
+@@ -815,15 +816,29 @@ void rpmh_rsc_write_next_wakeup(struct rsc_drv *drv)
+ 	if (!drv->tcs[CONTROL_TCS].num_tcs || !drv->genpd_nb.notifier_call)
+ 		return;
+ 
+-	/* Set highest time when system (timekeeping) is suspended */
+-	if (system_state == SYSTEM_SUSPEND)
++	/*
++	 * Set highest time when system (timekeeping) is suspended. Do the same
++	 * in suspend-to-idle: the cluster domain is then powered off through
++	 * dev_pm_genpd_suspend(), which does not run the genpd governor, so
++	 * next_hrtimer still holds the value computed at the last runtime idle
++	 * entry, which is already in the past.
++	 */
++	if (system_state == SYSTEM_SUSPEND || idle_should_enter_s2idle())
+ 		goto exit;
+ 
+ 	/* Find the earliest hrtimer wakeup from online cpus */
+ 	wakeup = dev_pm_genpd_get_next_hrtimer(drv->dev);
+ 
+-	/* Find the relative wakeup in kernel time scale */
++	/*
++	 * A wakeup that is not set or already in the past would make the
++	 * subtraction below negative, and the u64 conversion turn it into an
++	 * arbitrary deadline that the firmware may treat as already expired.
++	 */
+ 	now = ktime_get();
++	if (wakeup == KTIME_MAX || !ktime_after(wakeup, now))
++		goto exit;
++
++	/* Find the relative wakeup in kernel time scale */
+ 	wakeup = ktime_sub(wakeup, now);
+ 	wakeup_us = ktime_to_us(wakeup);
+ 
+-- 
+2.56.0
+

@@ -83,8 +83,13 @@ const versSecours = corps => corps.map(l => {
 });
 
 // Repos profond sous 7.3 (06/10) : le défaut, avec l'état système SS3 en plus.
-const versReposProfond73 = corps => corps.map(l => l.startsWith('    devicetree ')
-  ? '    devicetree /boot/sp12-el2-cam-pdc-ss3.dtb' : l);
+// 06/10 : avec Image-7.3rc3-el2-rsc = le défaut + correctif rpmh-rsc (échéance de réveil
+// périmée en s2idle), à l'essai avant de passer au quotidien.
+const versReposProfond73 = corps => corps.map(l => {
+  if (l.startsWith('    devicetree ')) return '    devicetree /boot/sp12-el2-cam-pdc-ss3.dtb';
+  if (l.startsWith('    linux ')) return l.replace('/boot/Image-7.3rc3-el2 ', '/boot/Image-7.3rc3-el2-rsc ');
+  return l;
+});
 
 // --- ce qu'on garde, dans l'ordre d'affichage voulu -------------------------
 // ['motif de titre' | null, id, titre, [commentaires], transform?]
