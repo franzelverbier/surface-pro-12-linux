@@ -1,0 +1,11 @@
+# SP12 — 06/10/2026 : sous 40 % sur batterie, éteindre au lieu de mettre en veille.
+# Exigé par systemd-suspend.service (drop-in sp12-garde-batterie.conf) : s'il sort en
+# échec, la veille est annulée. Voir systeme/bin/sp12-garde-batterie.js.
+[Unit]
+Description=SP12 - Garde de batterie avant la veille (sous 40 % : extinction)
+DefaultDependencies=no
+Before=systemd-suspend.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/node /usr/local/lib/sp12/sp12-garde-batterie.js
