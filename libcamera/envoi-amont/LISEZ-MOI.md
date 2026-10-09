@@ -44,3 +44,11 @@ git send-email --to=libcamera-devel@lists.libcamera.org \
 ```
 
 Le SMTP Infomaniak est déjà configuré dans le `.gitconfig` global.
+
+## v2 — ENVOYÉE le 2026-10-09 à 10:25 CEST
+
+Barnabás Pőcze a répondu le 05/10 (Message-ID `<35a59ca1-a166-482b-be5d-4ae24f58c36e@ideasonboard.com>`) :
+Martin Neiva n'ayant pas renvoyé sa version depuis plus d'un mois, il fusionnera une v2 de la nôtre.
+[`v2-0001-ipa-libipa-camera_sensor_helper-add-ov02c10.patch`](v2-0001-ipa-libipa-camera_sensor_helper-add-ov02c10.patch),
+rebasée sur master `8103c3f`, envoyée en réponse à ce message, à libcamera-devel avec Barnabás en copie.
+Message-ID : `<20261009082519.348785-1-info@humanlearning.ch>`. Serveur : `250`.
