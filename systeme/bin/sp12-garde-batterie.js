@@ -11,6 +11,15 @@
 // (Requires=). Sur batterie et sous SEUIL % : demande l'extinction et sort en
 // échec, ce qui annule la veille. Sur secteur, ou état inconnu : laisse dormir.
 //
+// 10/10/2026 : « systemctl poweroff » passait par logind, qui refuse toute extinction
+// tant que l'opération « suspend » qu'il mène est en cours (« Action suspend already in
+// progress ») : la garde n'a jamais éteint. La veille annulée, PowerDevil la redemandait
+// toutes les 10 s (cache fermé) ; le soir du 09/10, 676 tours en 2 h ont mené de 27 % à 2 %.
+// On demande donc l'extinction directement à systemd : poweroff.target en
+// replace-irreversibly annule les jobs de veille en attente, sans passer par logind.
+// Si l'extinction ne peut pas être demandée, on laisse dormir : une veille coûte ~3 %/h,
+// une boucle de veilles avortées quatre fois plus.
+//
 // SP12_GARDE_ESSAI=1 : annule la veille sans éteindre (pour vérifier le mécanisme).
 'use strict';
 const fs = require('fs');
@@ -36,5 +45,10 @@ if (pct >= SEUIL) {
   process.exit(0);
 }
 console.log(`garde batterie : ${pct.toFixed(0)} % sur batterie, sous le seuil de ${SEUIL} % — extinction au lieu de la veille`);
-try { execFileSync('/usr/bin/systemctl', ['poweroff', '--no-block']); } catch (e) { console.log(`échec de l'extinction : ${e.message}`); }
+try {
+  execFileSync('/usr/bin/systemctl', ['start', 'poweroff.target', '--job-mode=replace-irreversibly', '--no-block']);
+} catch (e) {
+  console.log(`échec de l'extinction (${e.message.split('\n')[0]}) — veille autorisée plutôt qu'une boucle de veilles avortées`);
+  process.exit(0);
+}
 process.exit(1);
