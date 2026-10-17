@@ -1,0 +1,14 @@
+# SP12 — 17/10/2026 : si le PHY PCIe du Wi-Fi n'a pas démarré (2 démarrages sur 33),
+# resonde le port 1c08000 au lieu de laisser la machine sans Wi-Fi jusqu'au prochain
+# redémarrage. Voir systeme/bin/sp12-pcie-wifi.js. Trace : /data/sp12data/diag/pcie-wifi.jsonl
+[Unit]
+Description=SP12 - Rattrapage du port PCIe du Wi-Fi
+After=systemd-modules-load.service systemd-udevd.service
+Before=NetworkManager.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/node /usr/local/lib/sp12/sp12-pcie-wifi.js
+
+[Install]
+WantedBy=multi-user.target
