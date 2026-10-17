@@ -1,0 +1,77 @@
+From cfe335cb3e7d66548f9cdd01e9503f95ad91a7b1 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Fran=C3=A7ois=20Roux?= <franzelfranzel@gmail.com>
+Date: Sat, 17 Oct 2026 16:25:51 +0200
+Subject: [PATCH] power: sequencing: qcom-wcn: power off WLAN at probe
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+The WLAN enable GPIO is requested with GPIOD_ASIS and then kept at its
+current level, so that a WLAN module left powered on by the firmware is
+not switched off. The FIXME explains why: toggling it would take the
+PCIe link down, and the controller driver could not recover from that.
+
+That reasoning held while the PCIe link was trained before the
+sequencer probed. Since commit b921aa3f8dec ("PCI/pwrctrl: Switch to
+pwrctrl create, power on/off, destroy APIs"), qcom_pcie_host_init()
+powers the endpoint through pwrctrl before it starts link training, and
+defers until the pwrctrl driver is bound. That driver cannot bind
+before this sequencer has probed. Power-on therefore always comes
+before link training, and keeping the firmware state is now harmful.
+
+Request the GPIO as GPIOD_OUT_LOW. The chip is then off when the
+sequencer probes, and pwrctrl powers it up cleanly right before link
+training. Drop the FIXME and the code that preserved the firmware
+state.
+
+Fixes: b921aa3f8dec ("PCI/pwrctrl: Switch to pwrctrl create, power on/off, destroy APIs")
+Closes: https://lore.kernel.org/all/CAPjyS8dY0Q_o3XmFjuKZZsjhzhoSNL+ZGJtw5cQt8HiV3sUtxA@mail.gmail.com/
+Cc: stable@vger.kernel.org
+Assisted-by: LLM
+Signed-off-by: François Roux <franzelfranzel@gmail.com>
+Tested-by: Dale Whinham <daleyo@gmail.com>
+Reviewed-by: Manivannan Sadhasivam <manivannan.sadhasivam@oss.qualcomm.com>
+[SP12: v2 as applied by Bartosz Golaszewski on 2026-10-12, brgl dbd674ccf30f;
+ carried until it reaches mainline]
+---
+ drivers/power/sequencing/pwrseq-qcom-wcn.c | 16 +---------------
+ 1 file changed, 1 insertion(+), 15 deletions(-)
+
+diff --git a/drivers/power/sequencing/pwrseq-qcom-wcn.c b/drivers/power/sequencing/pwrseq-qcom-wcn.c
+index d41793e1f..34146d637 100644
+--- a/drivers/power/sequencing/pwrseq-qcom-wcn.c
++++ b/drivers/power/sequencing/pwrseq-qcom-wcn.c
+@@ -496,15 +496,8 @@ static int pwrseq_qcom_wcn_probe(struct platform_device *pdev)
+ 		return dev_err_probe(dev, PTR_ERR(ctx->bt_gpio),
+ 				     "Failed to get the Bluetooth enable GPIO\n");
+ 
+-	/*
+-	 * FIXME: This should actually be GPIOD_OUT_LOW, but doing so would
+-	 * cause the WLAN power to be toggled, resulting in PCIe link down.
+-	 * Since the PCIe controller driver is not handling link down currently,
+-	 * the device becomes unusable. So we need to keep this workaround until
+-	 * the link down handling is implemented in the controller driver.
+-	 */
+ 	ctx->wlan_gpio = devm_gpiod_get_optional(dev, "wlan-enable",
+-						 GPIOD_ASIS);
++						 GPIOD_OUT_LOW);
+ 	if (IS_ERR(ctx->wlan_gpio))
+ 		return dev_err_probe(dev, PTR_ERR(ctx->wlan_gpio),
+ 				     "Failed to get the WLAN enable GPIO\n");
+@@ -515,13 +508,6 @@ static int pwrseq_qcom_wcn_probe(struct platform_device *pdev)
+ 		return dev_err_probe(dev, PTR_ERR(ctx->xo_clk_gpio),
+ 				     "Failed to get the XO_CLK GPIO\n");
+ 
+-	/*
+-	 * Set direction to output but keep the current value in order to not
+-	 * disable the WLAN module accidentally if it's already powered on.
+-	 */
+-	gpiod_direction_output(ctx->wlan_gpio,
+-			       gpiod_get_value_cansleep(ctx->wlan_gpio));
+-
+ 	ctx->clk = devm_clk_get_optional(dev, NULL);
+ 	if (IS_ERR(ctx->clk))
+ 		return dev_err_probe(dev, PTR_ERR(ctx->clk),
+-- 
+2.56.0
+

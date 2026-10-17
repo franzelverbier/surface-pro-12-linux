@@ -91,6 +91,16 @@ const versReposProfond73 = corps => corps.map(l => {
   return l;
 });
 
+// 7.3-rc7 (17/10) : le défaut, avec seulement le noyau et l'initramfs changés. Pile
+// rebasée sur v7.3-rc7 : 0001 (revert QoS) et 0002 (handover q6v5_pas) sont en
+// mainline et sortent ; pwrseq « power off WLAN at probe » (appliqué par Bartosz le
+// 12/10) entre. Même DTB, même ligne de commande.
+const vers73rc7 = corps => corps.map(l => {
+  if (l.startsWith('    initrd ')) return '    initrd /boot/initramfs-7.3rc7.img';
+  if (l.startsWith('    linux ')) return l.replace('/boot/Image-7.3rc3-el2 ', '/boot/Image-7.3rc7-el2 ');
+  return l;
+});
+
 // --- ce qu'on garde, dans l'ordre d'affichage voulu -------------------------
 // ['motif de titre' | null, id, titre, [commentaires], transform?]
 // Un motif null introduit un séparateur de groupe.
@@ -106,6 +116,14 @@ const garder = [
     "⚠️ Ne pas débrancher un écran externe qui n'a pas réussi à s'allumer : plantage.",
     "Config dans kernel/config-7.3.0-rc3-mainline-el2 ; rebâtir avec LOCALVERSION=."],
    vers73El2Juin],
+
+  ['mainline-73-el2-juin', 'mainline-73rc7',
+   "SP12 — essai : 7.3-rc7 en EL2  (même DTB que le défaut)",
+   ["Le défaut, noyau 7.3-rc7 (12/10) : pile rebasée, 0001/0002 retirés (en mainline),",
+    "pwrseq « power off WLAN at probe » ajouté. Apporte UCSI glink (accès après",
+    "libération au retrait) et l'index CAM DisplayPort : à tester avec l'écran USB-C.",
+    "Modules dans /lib/modules/7.3.0-rc7-mainline : n'écrase rien du défaut rc3."],
+   vers73rc7],
 
   ['courant', 'el2-cam',
    "SP12 — noyau -nft + caméras  (EL2 + KVM + son)  ← l'ancien défaut",
