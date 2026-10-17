@@ -106,10 +106,17 @@ const vers73rc7 = corps => corps.map(l => {
 // Un motif null introduit un séparateur de groupe.
 const garder = [
   [null, null, '═══ AU QUOTIDIEN ═══'],
+  ['mainline-73-el2-juin', 'mainline-73rc7',
+   "SP12 — 7.3-rc7 en EL2 : KVM + son + caméras + veille + écran USB-C  ← DÉFAUT",
+   ["DÉFAUT DEPUIS LE 17/10/2026. Le défaut rc3 avec le noyau 7.3-rc7 (12/10) : pile rebasée, 0001/0002 retirés (en mainline),",
+    "pwrseq « power off WLAN at probe » ajouté. Apporte UCSI glink (accès après",
+    "libération au retrait) et l'index CAM DisplayPort : à tester avec l'écran USB-C.",
+    "Modules dans /lib/modules/7.3.0-rc7-mainline : n'écrase rien du défaut rc3."],
+   vers73rc7],
 
   ['mainline-73-el2', 'mainline-73-el2-juin',
-   "SP12 — 7.3 en EL2 : KVM + son + caméras + veille + écran USB-C  ← DÉFAUT",
-   ["DÉFAUT DEPUIS LE 04/10/2026. Noyau 7.3-rc3 + patches/7.3 0001-0012 avec le DTB",
+   "SP12 — 7.3-rc3 en EL2  (repli : le défaut du 04 au 17/10)",
+   ["Défaut du 04/10 au 17/10/2026. Noyau 7.3-rc3 + patches/7.3 0001-0012 avec le DTB",
     "de juin + caméras. EL2+KVM, ADSP+CDSP rattachés, son, batterie, 2 caméras,",
     "veille s2idle tenue 4 h 13 (PDC Purwa, KEY_WAKEUP, tactile retiré des réveils,",
     "ath12k déchargé), écran externe en USB-C direct sur le port A.",
@@ -117,13 +124,6 @@ const garder = [
     "Config dans kernel/config-7.3.0-rc3-mainline-el2 ; rebâtir avec LOCALVERSION=."],
    vers73El2Juin],
 
-  ['mainline-73-el2-juin', 'mainline-73rc7',
-   "SP12 — essai : 7.3-rc7 en EL2  (même DTB que le défaut)",
-   ["Le défaut, noyau 7.3-rc7 (12/10) : pile rebasée, 0001/0002 retirés (en mainline),",
-    "pwrseq « power off WLAN at probe » ajouté. Apporte UCSI glink (accès après",
-    "libération au retrait) et l'index CAM DisplayPort : à tester avec l'écran USB-C.",
-    "Modules dans /lib/modules/7.3.0-rc7-mainline : n'écrase rien du défaut rc3."],
-   vers73rc7],
 
   ['courant', 'el2-cam',
    "SP12 — noyau -nft + caméras  (EL2 + KVM + son)  ← l'ancien défaut",
@@ -198,8 +198,9 @@ const entete = `# Surface Pro 12 (x1p42100) — menu de démarrage
 # noyaux, initramfs et DTB correspondants sont toujours dans /boot.
 # RIEN N'A ÉTÉ SUPPRIMÉ DU DISQUE : remettre une entrée = recopier son bloc.
 #
-# DÉFAUT DEPUIS LE 04/10/2026 : mainline-73-el2-juin (7.3 en EL2, DTB de juin +
-# caméras). Il fait tout ce que faisait el2-cam et y ajoute la veille qui tient
+# DÉFAUT DEPUIS LE 17/10/2026 : mainline-73rc7 (7.3-rc7 en EL2, DTB de juin + caméras),
+# avec mainline-73-el2-juin (même chose en rc3, défaut du 04 au 17/10) juste dessous.
+# Avant : mainline-73-el2-juin (7.3 en EL2, DTB de juin + caméras). Il fait tout ce que faisait el2-cam et y ajoute la veille qui tient
 # (4 h 13 le 04/10) et l'écran externe en USB-C. En cas de doute, el2-cam (noyau
 # -nft, défaut du 16/09 au 04/10) est juste en dessous, inchangée.
 #
@@ -222,7 +223,7 @@ const entete = `# Surface Pro 12 (x1p42100) — menu de démarrage
 # qui les utilise doit porter modprobe.blacklist=qcom_q6v5_pas.
 
 set timeout=5
-set default=mainline-73-el2-juin
+set default=mainline-73rc7
 
 # Police agrandie — l'écran fait 2196 px de large et la police par défaut de
 # GRUB y est minuscule. TOUT EST CONDITIONNEL : si l'image GRUB n'a pas ces
