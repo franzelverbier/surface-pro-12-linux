@@ -170,6 +170,14 @@ const garder = [
    corps => versReposProfond73(corps).map(l => l.startsWith('    linux ')
      ? l.replace(' pd_ignore_unused', '') : l)],
 
+  ['mainline-73rc7', 'ss3-rc7',
+   "SP12 — essai : 7.3-rc7 + état système SS3  (mesure au repos)",
+   ["Le défaut rc7 avec sp12-el2-cam-pdc-ss3.dtb (= DTB du défaut + dts/etat-systeme-ss3.dtso).",
+    "Allumée au repos, l'APSS s'endort enfin (apss monte) ; en veille, le firmware rend la main",
+    "~14 000 fois/s et la veille coûte plus (1,40 W contre 1,10 W, §53). 18/10 : mesure du gain",
+    "allumé avec systeme/bin/sp12-mesure-repos.js, à comparer au défaut."],
+   corps => corps.map(l => l.startsWith('    devicetree ') ? '    devicetree /boot/sp12-el2-cam-pdc-ss3.dtb' : l)],
+
   [null, null, '═══ SECOURS ═══'],
 
   ['amont-el1-nft', 'amont-el1-nft',
