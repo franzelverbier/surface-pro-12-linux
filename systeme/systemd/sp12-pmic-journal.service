@@ -1,0 +1,17 @@
+# SP12 — 18/10/2026 : à chaque démarrage, sauvegarde le journal d'allumage du PMIC
+# (qui a déclenché le dernier arrêt ou redémarrage : PS_HOLD, chien de garde, bouton,
+# sous-tension…). Le PMIC n'en garde qu'une trentaine d'entrées, soit deux cycles :
+# sans cette copie, un plantage suivi de deux redémarrages efface la preuve.
+# Copies dans /data/sp12data/diag/pmic-journal/. Voir systeme/bin/sp12-pmic-journal.js.
+[Unit]
+Description=SP12 - Sauvegarde du journal d'allumage du PMIC
+After=local-fs.target sys-kernel-debug.mount
+RequiresMountsFor=/data/sp12data
+
+[Service]
+Type=oneshot
+ExecStartPre=/usr/bin/mkdir -p /data/sp12data/diag/pmic-journal
+ExecStart=/usr/bin/sh -c '/usr/bin/node /usr/local/lib/sp12/sp12-pmic-journal.js --brut > "/data/sp12data/diag/pmic-journal/$(date +%%Y%%m%%d-%%H%%M%%S)-$(uname -r).txt"'
+
+[Install]
+WantedBy=multi-user.target
