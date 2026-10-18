@@ -69,6 +69,7 @@ function bilan() {
       h > 0 ? `${(wh / h).toFixed(2)} W` : '—',
       `${(100 * (a.energie_uWh - b.energie_uWh) / a.energie_pleine_uWh / h).toFixed(1)} %/h`,
       `cxsd+${delta('cxsd')} aosd+${delta('aosd')} ddr+${delta('ddr')}`,
+      `adsp ${(delta('adsp') / (h * 3600)).toFixed(0)} réveils/s`,
       Object.keys(b.genpd || {}).map(k => `${k} ${(((b.genpd[k].temps_ms - ((a.genpd || {})[k] || {}).temps_ms) || 0) / 1000).toFixed(0)} s / s2idle+${b.genpd[k].s2idle - (((a.genpd || {})[k] || {}).s2idle || 0)}`).join(', ') || 'genpd ?',
       (secteur ? 'SECTEUR, à écarter ' : '') + (h < 0.5 ? 'courte, peu fiable' : ''),
       a.noyau,
@@ -76,6 +77,11 @@ function bilan() {
   }
   console.log(lignes.length ? lignes.join('\n') : 'aucune veille mesurée');
 }
+
+// 18/10/2026 — expérience « veille sans glink » ABANDONNÉE : décharger les clients pmic_glink
+// ferme le canal rpmsg PMIC_RTR_ADSP_APPS, que l'ADSP ne rouvre jamais ; en EL2, Linux ne peut
+// pas redémarrer l'ADSP : batterie, UCSI et DP alt mode perdus jusqu'au redémarrage. Ne pas
+// réessayer (c'était déjà la « batterie indéfinie » des essais du 06/10).
 
 const [phase] = process.argv.slice(2);
 if (phase === 'bilan') bilan();
