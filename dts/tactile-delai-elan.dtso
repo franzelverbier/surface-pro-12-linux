@@ -1,0 +1,12 @@
+// SP12 — 18/10/2026 : délai après la mise sous tension du tactile ELAN (04F3:4377).
+// Sans tactile en source de réveil (service sp12-veille-tactile), i2c-hid coupe son
+// alimentation en veille et la rétablit au réveil, puis envoie SET_POWER(ON) aussitôt :
+// la puce, encore en démarrage, ne répond pas (ENXIO), « failed to change power
+// setting » et « i2c_hid_core_pm_resume returns -6 ». 300 ms : le délai de démarrage
+// des contrôleurs ELAN dans i2c-hid-of-elan.c (post_gpio_reset_on_delay_ms).
+/dts-v1/;
+/plugin/;
+
+&{/soc@0/geniqup@ac0000/i2c@a80000/touchscreen@16} {
+	post-power-on-delay-ms = <300>;
+};
