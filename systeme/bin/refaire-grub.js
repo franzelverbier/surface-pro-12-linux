@@ -170,13 +170,10 @@ const garder = [
    corps => versReposProfond73(corps).map(l => l.startsWith('    linux ')
      ? l.replace(' pd_ignore_unused', '') : l)],
 
-  ['mainline-73rc7', 'tactile-rc7',
-   "SP12 — essai : 7.3-rc7 + délai du tactile ELAN  (réveil sans erreur ?)",
-   ["Le défaut rc7 avec sp12-el2-cam-pdc-tactile.dtb (= DTB du défaut + dts/tactile-delai-elan.dtso :",
-    "post-power-on-delay-ms = 300 sur le tactile). Au réveil, i2c-hid rallume la dalle puis lui",
-    "parle aussitôt : sans délai, « failed to change power setting » et resume -6. 18/10."],
-   corps => corps.map(l => l.startsWith('    devicetree ') ? '    devicetree /boot/sp12-el2-cam-pdc-tactile.dtb' : l)],
-
+  // 19/10 : entrée tactile-rc7 retirée. Le délai de 300 ms (dts/tactile-delai-elan.dtso) n'a
+  // rien changé : la reprise du tactile prend ~60 ms et échoue toujours en ENXIO, sans que
+  // l'attente de 300 ms apparaisse dans la chronologie (pm_print_times). Le tactile marche
+  // quand même après la veille ; la puce ELAN semble refuser le bus tant qu'on ne la touche pas.
   ['mainline-73rc7', 'ss3-rc7',
    "SP12 — essai : 7.3-rc7 + état système SS3  (mesure au repos)",
    ["Le défaut rc7 avec sp12-el2-cam-pdc-ss3.dtb (= DTB du défaut + dts/etat-systeme-ss3.dtso).",

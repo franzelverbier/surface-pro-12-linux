@@ -1,4 +1,4 @@
-// SP12 — 18/10/2026 : délai après la mise sous tension du tactile ELAN (04F3:4377).
+// SANS EFFET (19/10, voir refaire-grub.js). SP12 — 18/10/2026 : délai après la mise sous tension du tactile ELAN (04F3:4377).
 // Sans tactile en source de réveil (service sp12-veille-tactile), i2c-hid coupe son
 // alimentation en veille et la rétablit au réveil, puis envoie SET_POWER(ON) aussitôt :
 // la puce, encore en démarrage, ne répond pas (ENXIO), « failed to change power
