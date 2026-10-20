@@ -1,0 +1,97 @@
+From bcf190819595e6aa49b5de40317c2a74e59695b6 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Fran=C3=A7ois=20Roux?= <info@humanlearning.ch>
+Date: Fri, 9 Oct 2026 10:23:19 +0200
+Subject: [PATCH v3] ipa: libipa: camera_sensor_helper: add ov02c10
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Without an entry for ov02c10, the software ISP used by the simple
+pipeline handler has no gain model or black level for this sensor and
+logs:
+
+  IPASoft: Failed to create camera sensor helper for ov02c10
+
+AGC then still runs, but on raw analogue-gain register values instead
+of a linear gain, which makes it converge poorly.
+
+The kernel driver (drivers/media/i2c/ov02c10.c) advertises analogue-gain
+register values in the range 0x10..0xf8 with a default of 0x10, and
+writes them to the 16-bit register at 0x3508 as (val << 4).  That
+register is graded in 1/256 steps, so both the control range and the
+register encoding agree on 1/16 steps: the default of 0x10 is unity gain
+and the maximum of 0xf8 is 15.5x.  Without a datasheet, this was checked
+by measurement on a second machine (Lenovo Yoga Slim 7x, X1E80100): at a
+fixed exposure, the signal above the pedestal follows code / 16 to
+within 1.5% from 0x18 to 0xf8 (1.49 at 0x18, 4.03 at 0x40, 8.11 at 0x80,
+15.32 at 0xf8).
+
+The sensor outputs 10-bit Bayer data (MEDIA_BUS_FMT_SGRBG10_1X10).  The
+driver programs a black level target of 0x40 in the BLC registers
+0x4002/0x4003, which scales to 4096 at the 16-bit width expected by
+blackLevel(), as for ov01a10, ov08d10, ov2740 and ov5675, which use
+the same 0x40 target at 10 bits.  A
+dark-frame measurement matches it: the mean pedestal is 64.2 LSB, and
+changing the target to 0x80 while streaming moves it to 128.2 LSB on all
+four colour channels from the next frame.
+
+Tested on the front camera of a Microsoft Surface Pro 12 (Qualcomm
+X1P42100) driven by the qcom CAMSS pipeline.  Before the change the IPA
+reported "Exposure 4-2320, gain 16-248 (1)"; after it reports
+"Exposure 4-2320, gain 1-15.5 (0.145)".
+
+Tested-by: Birk Skyum <birk.skyum@pm.me>
+Signed-off-by: François Roux <info@humanlearning.ch>
+---
+Changes in v3:
+- Keep the motivation paragraph, as Laurent asked.
+- Gain model: add Birk's measurement on a Lenovo Yoga Slim 7x, which
+  shows the code / 16 scale is linear over the whole range, since no
+  datasheet is available to us.
+- Black level: name the sensors that share the 0x40 target at 10 bits
+  instead of "the other OmniVision sensors", which was wrong (ov4689,
+  ov5640 and ov5693 differ).
+- Add Birk's Tested-by.
+
+Changes in v2:
+- Take the black level from the BLC target the driver programs
+  (0x4002/0x4003), as suggested by Barnabás, and keep the dark-frame
+  measurement only as confirmation (target 0x40 -> 0x80 moves the
+  pedestal by exactly 64 LSB).
+- AGC does run without the helper, just poorly: reword the commit
+  message accordingly.
+- Rebased on master: the helper now sits between ov01a10 and ov08d10.
+
+The same values were posted earlier by Martin Neiva de Carvalho as patch
+1/5 of "softisp: Five fixes found on a camera with no hardware ISP".
+ src/ipa/libipa/camera_sensor_helper.cpp | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/src/ipa/libipa/camera_sensor_helper.cpp b/src/ipa/libipa/camera_sensor_helper.cpp
+index 359040e..72f974e 100644
+--- a/src/ipa/libipa/camera_sensor_helper.cpp
++++ b/src/ipa/libipa/camera_sensor_helper.cpp
+@@ -713,6 +713,18 @@ public:
+ };
+ REGISTER_CAMERA_SENSOR_HELPER("ov01a10", CameraSensorHelperOv01a10)
+ 
++class CameraSensorHelperOv02c10 : public CameraSensorHelper
++{
++public:
++	CameraSensorHelperOv02c10()
++	{
++		/* From Linux kernel driver: 0x40 at 10bits. */
++		blackLevel_ = 4096;
++		gain_ = AnalogueGainLinear{ 1, 0, 0, 16 };
++	}
++};
++REGISTER_CAMERA_SENSOR_HELPER("ov02c10", CameraSensorHelperOv02c10)
++
+ class CameraSensorHelperOv08d10 : public CameraSensorHelper
+ {
+ public:
+
+base-commit: 8103c3f29fba61dbd1d3bbf1a099280c5f3217e3
+-- 
+2.56.0
+

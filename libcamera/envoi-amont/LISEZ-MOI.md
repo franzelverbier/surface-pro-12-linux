@@ -52,3 +52,6 @@ Martin Neiva n'ayant pas renvoyé sa version depuis plus d'un mois, il fusionner
 [`v2-0001-ipa-libipa-camera_sensor_helper-add-ov02c10.patch`](v2-0001-ipa-libipa-camera_sensor_helper-add-ov02c10.patch),
 rebasée sur master `8103c3f`, envoyée en réponse à ce message, à libcamera-devel avec Barnabás en copie.
 Message-ID : `<20261009082519.348785-1-info@humanlearning.ch>`. Serveur : `250`.
+
+## v3 — BROUILLON (20/10/2026), pas envoyée
+Réponses du 19/10 : Birk Skyum (Yoga Slim 7x, même capteur) mesure le gain linéaire en code/16 à 1,5 % près et donne son Tested-by ; Laurent Pinchart veut **garder** le paragraphe de motivation, trouve « louche » le décalage <<4 du pilote noyau (« quelqu'un avec la doc ? »), et relève que « comme les autres OmniVision de ce fichier » est faux (ov4689, ov5640, ov5693 ont d'autres niveaux de noir). Brouillon v3 qui répond aux trois points : `v3-0001-…BROUILLON.patch`. À rebaser sur master au moment de l'envoi groupé, en réponse au message de Laurent.
