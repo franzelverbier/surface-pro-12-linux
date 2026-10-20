@@ -174,6 +174,16 @@ const garder = [
   // rien changé : la reprise du tactile prend ~60 ms et échoue toujours en ENXIO, sans que
   // l'attente de 300 ms apparaisse dans la chronologie (pm_print_times). Le tactile marche
   // quand même après la veille ; la puce ELAN semble refuser le bus tant qu'on ne la touche pas.
+  ['mainline-73rc7', 'pdc-purwa-rc7',
+   "SP12 — essai : 7.3-rc7 + PDC Purwa (couvercle, tactile)",
+   ["20/10 : le capteur du couvercle (TLMM 2, via le PDC) ne lève d'interruption qu'à l'ouverture,",
+    "jamais à la fermeture : SW_LID ne change jamais, Plasma ne met pas en veille au rabat du cache.",
+    "Notre overlay du 04/10 (compatible x1e80100-pdc) applique à Purwa le contournement x1e_quirk,",
+    "que Qualcomm réserve au X1E. Ici : correctif linux-next 086eac130a (compatible Purwa = mode",
+    "direct SANS x1e_quirk) + DTB de juin d'origine (compatible x1p42100-pdc)."],
+   corps => corps.map(l => l.startsWith('    devicetree ') ? '    devicetree /boot/sp12-el2-cam.dtb'
+     : l.startsWith('    linux ') ? l.replace('/boot/Image-7.3rc7-el2 ', '/boot/Image-7.3rc7-el2-pdcpurwa ') : l)],
+
   ['mainline-73rc7', 'ss3-rc7',
    "SP12 — essai : 7.3-rc7 + état système SS3  (mesure au repos)",
    ["Le défaut rc7 avec sp12-el2-cam-pdc-ss3.dtb (= DTB du défaut + dts/etat-systeme-ss3.dtso).",
