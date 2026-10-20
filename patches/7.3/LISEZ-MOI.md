@@ -56,3 +56,14 @@ contournement Hamoa du DTS Purwa (`13ca1c0b7d`) : l'amont a suivi le même diagn
 
 Branche `cameras-73-rc7` réécrite (sauvegarde : étiquette `sauvegarde/cameras-73-rc7-avant-pdc`) ;
 l'Image en service est encore bâtie avec l'ancienne 0011 (le code PDC y est inerte).
+
+## 0013 — PDC Purwa (20/10/2026)
+
+`0013` = linux-next `086eac130a` (Maulik Shah) : compatible `qcom,x1p42100-pdc` → PDC remis en
+mode direct par SCM, **sans** `x1e_quirk` (le défaut matériel du X1E est corrigé dans le
+silicium de Purwa). Le défaut reprend le DTB de juin d'origine (`sp12-el2-cam.dtb`, qui porte
+déjà ce compatible) au lieu de `sp12-el2-cam-pdc.dtb` (overlay du 04/10, compatible X1E).
+Effet mesuré : le capteur du couvercle (TLMM 2) ne levait d'interruption qu'à l'ouverture,
+jamais à la fermeture, donc SW_LID ne changeait jamais et rabattre le cache ne mettait pas en
+veille. Avec 0013 : « Lid closed », veille, réveil à l'ouverture ; tactile calme (0 IRQ/s).
+L'ancien overlay `dts/pdc-x1e80100.dtso` n'est plus utilisé par le défaut.

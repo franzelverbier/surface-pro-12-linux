@@ -95,7 +95,10 @@ const versReposProfond73 = corps => corps.map(l => {
 // rebasée sur v7.3-rc7 : 0001 (revert QoS) et 0002 (handover q6v5_pas) sont en
 // mainline et sortent ; pwrseq « power off WLAN at probe » (appliqué par Bartosz le
 // 12/10) entre. Même DTB, même ligne de commande.
+// 20/10 : DTB de juin d'origine (compatible x1p42100-pdc) avec le correctif PDC Purwa
+// (0013, linux-next 086eac130a) : mode direct sans x1e_quirk ; couvercle et tactile OK.
 const vers73rc7 = corps => corps.map(l => {
+  if (l.startsWith('    devicetree ')) return '    devicetree /boot/sp12-el2-cam.dtb';
   if (l.startsWith('    initrd ')) return '    initrd /boot/initramfs-7.3rc7.img';
   if (l.startsWith('    linux ')) return l.replace('/boot/Image-7.3rc3-el2 ', '/boot/Image-7.3rc7-el2 ');
   return l;
@@ -108,7 +111,7 @@ const garder = [
   [null, null, '═══ AU QUOTIDIEN ═══'],
   ['mainline-73-el2-juin', 'mainline-73rc7',
    "SP12 — 7.3-rc7 en EL2 : KVM + son + caméras + veille + écran USB-C  ← DÉFAUT",
-   ["DÉFAUT DEPUIS LE 17/10/2026. Le défaut rc3 avec le noyau 7.3-rc7 (12/10) : pile rebasée, 0001/0002 retirés (en mainline),",
+   ["DÉFAUT DEPUIS LE 17/10/2026 ; depuis le 20/10 avec le PDC Purwa (0013) et le DTB de juin d'origine : le couvercle met en veille. Le défaut rc3 avec le noyau 7.3-rc7 (12/10) : pile rebasée, 0001/0002 retirés (en mainline),",
     "pwrseq « power off WLAN at probe » ajouté. Apporte UCSI glink (accès après",
     "libération au retrait) et l'index CAM DisplayPort : à tester avec l'écran USB-C.",
     "Modules dans /lib/modules/7.3.0-rc7-mainline : n'écrase rien du défaut rc3."],
@@ -174,16 +177,6 @@ const garder = [
   // rien changé : la reprise du tactile prend ~60 ms et échoue toujours en ENXIO, sans que
   // l'attente de 300 ms apparaisse dans la chronologie (pm_print_times). Le tactile marche
   // quand même après la veille ; la puce ELAN semble refuser le bus tant qu'on ne la touche pas.
-  ['mainline-73rc7', 'pdc-purwa-rc7',
-   "SP12 — essai : 7.3-rc7 + PDC Purwa (couvercle, tactile)",
-   ["20/10 : le capteur du couvercle (TLMM 2, via le PDC) ne lève d'interruption qu'à l'ouverture,",
-    "jamais à la fermeture : SW_LID ne change jamais, Plasma ne met pas en veille au rabat du cache.",
-    "Notre overlay du 04/10 (compatible x1e80100-pdc) applique à Purwa le contournement x1e_quirk,",
-    "que Qualcomm réserve au X1E. Ici : correctif linux-next 086eac130a (compatible Purwa = mode",
-    "direct SANS x1e_quirk) + DTB de juin d'origine (compatible x1p42100-pdc)."],
-   corps => corps.map(l => l.startsWith('    devicetree ') ? '    devicetree /boot/sp12-el2-cam.dtb'
-     : l.startsWith('    linux ') ? l.replace('/boot/Image-7.3rc7-el2 ', '/boot/Image-7.3rc7-el2-pdcpurwa ') : l)],
-
   ['mainline-73rc7', 'ss3-rc7',
    "SP12 — essai : 7.3-rc7 + état système SS3  (mesure au repos)",
    ["Le défaut rc7 avec sp12-el2-cam-pdc-ss3.dtb (= DTB du défaut + dts/etat-systeme-ss3.dtso).",
