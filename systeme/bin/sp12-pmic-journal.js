@@ -9,7 +9,7 @@
 //
 // Format et libellés repris du pilote Qualcomm « pmic-pon-log »
 // (drivers/soc/qcom/pmic-pon-log.c des noyaux Android SM8550), qui lit SDAM 5 et 6 du
-// PMK8550 (0x7400, 0x7500) ; le SP12 n'en a qu'un actif (REG_SDAM_COUNT = 1).
+// PMK8550 (0x7400, 0x7500) ; les deux sont utilisés (REG_SDAM_COUNT = 1, soit 2 SDAM).
 // Lecture seule, par le debugfs regmap de l'esclave SPMI 0-00 : il faut root.
 //
 //   sudo node sp12-pmic-journal.js           → le journal décodé, du plus ancien au plus récent
@@ -73,7 +73,9 @@ for (const l of fs.readFileSync(REGMAP, 'utf8').split('\n')) {
 }
 const lire = (n, off) => { const v = regs.get(SDAM[n] + off); if (v === undefined) throw new Error(`registre ${hex(SDAM[n] + off, 4)} illisible`); return v; };
 
-const nbSdam = Math.min(lire(0, REG_SDAM_COUNT), SDAM.length);
+// REG_SDAM_COUNT vaut le nombre de SDAM MOINS UN (pmic-pon-log.c : sdam_fifo_count = reg + 1).
+// 20/10 : lu comme un compte, il rejetait tout journal dont l'écriture était passée dans SDAM 6.
+const nbSdam = Math.min(lire(0, REG_SDAM_COUNT) + 1, SDAM.length);
 const ptr = lire(0, REG_PUSH_PTR), sdamFin = lire(0, REG_PUSH_SDAM_NUM);
 if (nbSdam < 1 || ptr < DEBUT || ptr > FIN || sdamFin >= nbSdam) {
   console.error(`journal incohérent : SDAM_COUNT=${nbSdam}, PUSH_PTR=${hex(ptr)}, PUSH_SDAM=${sdamFin}`);
